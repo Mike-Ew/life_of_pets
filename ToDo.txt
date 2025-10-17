@@ -1,5 +1,0 @@
-To do for Monday
-Mobile app basic: topic, user requirements, target audience
-Screen structures: figma prototype. how many screens are in your app, and the relationship between them.
-What does each screen do, and how they fit your design and function requirements. 
-
