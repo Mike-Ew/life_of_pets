@@ -50,9 +50,41 @@ The app is configured in `app.json` with:
 - Bundle identifier: `com.anonymous.life-of-pets`
 - iOS tablet support enabled
 
+## Project Documentation
+
+**IMPORTANT**: Before starting any work, read these files in order:
+
+1. **`/docs/ToDo_Documentation.md`** - Complete MVP specification including:
+   - Feature requirements and scope (Sprint 1: Pet Profiles, Sprint 2: Pet Care)
+   - Database schemas for all tables
+   - API endpoint specifications
+   - UI workflows and acceptance criteria
+
+2. **`/docs/ai/current-state.md`** - Current implementation status:
+   - What's actually built vs. what's planned
+   - Dependencies that need to be installed
+   - Current blockers
+
+3. **`/docs/ai/handoff.md`** - Context from the last AI session:
+   - What was just completed
+   - Recommended next steps
+   - Open questions that need decisions
+
+4. **`/docs/Architecture1.png`** & **`/docs/Architecture2.png`** - Complete UI/UX flow diagrams
+
+### Working with Other AIs
+
+This project uses multiple AI assistants (Claude, Gemini). The `/docs/ai/` folder coordinates work between sessions:
+
+- **Always read** `current-state.md` and `handoff.md` before starting work
+- **Update** `handoff.md` with your progress and next steps when done
+- **Update** `current-state.md` after completing features
+- **Document decisions** in `decisions.md` when making architectural choices
+- **Optional**: Add detailed notes to `/docs/ai/work-logs/claude/`
+
 ## Development Notes
 
 - The app uses inline styles with `StyleSheet.create` following standard React Native conventions
 - Native iOS and Android folders are gitignored as Expo manages them
 - The codebase currently has no navigation, state management, or data persistence implemented
-- Architecture diagrams in `docs/` should be consulted when implementing the multi-screen structure
+- The MVP is scoped to Pet Profiles and Pet Care only (matching, chat, notifications deferred)
