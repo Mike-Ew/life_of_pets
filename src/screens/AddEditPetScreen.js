@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,7 +7,9 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
+  ActivityIndicator,
 } from "react-native";
+import { petAPI } from "../services/api";
 
 export default function AddEditPetScreen({ route, navigation }) {
   const { petId } = route.params || {};
@@ -18,6 +20,32 @@ export default function AddEditPetScreen({ route, navigation }) {
   const [breed, setBreed] = useState("");
   const [description, setDescription] = useState("");
   const [selectedTags, setSelectedTags] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isEditing) {
+      loadPet();
+    }
+  }, [petId]);
+
+  const loadPet = async () => {
+    try {
+      setLoading(true);
+      const pet = await petAPI.getById(petId);
+      setName(pet.name);
+      setAge(pet.age.toString());
+      setBreed(pet.breed);
+      setDescription(pet.description || "");
+      setSelectedTags(pet.temperament_tags || []);
+    } catch (error) {
+      console.error('Error loading pet:', error);
+      Alert.alert('Error', 'Failed to load pet details');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const availableTags = [
     "friendly",
@@ -42,7 +70,7 @@ export default function AddEditPetScreen({ route, navigation }) {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       Alert.alert("Error", "Please enter a pet name");
       return;
@@ -53,18 +81,56 @@ export default function AddEditPetScreen({ route, navigation }) {
       return;
     }
 
-    // In a real app, this would save to backend/state
-    Alert.alert(
-      "Success",
-      `Pet ${isEditing ? "updated" : "created"} successfully!`,
-      [
-        {
-          text: "OK",
-          onPress: () => navigation.goBack(),
-        },
-      ]
-    );
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 0) {
+      Alert.alert("Error", "Please enter a valid age");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const petData = {
+        name: name.trim(),
+        age: ageNum,
+        breed: breed.trim(),
+        description: description.trim() || null,
+        temperament_tags: selectedTags,
+      };
+
+      if (isEditing) {
+        await petAPI.update(petId, petData);
+      } else {
+        await petAPI.create(petData);
+      }
+
+      Alert.alert(
+        "Success",
+        `Pet ${isEditing ? "updated" : "created"} successfully!`,
+        [
+          {
+            text: "OK",
+            onPress: () => navigation.goBack(),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error saving pet:', error);
+      Alert.alert(
+        'Error',
+        error.response?.data?.error || 'Failed to save pet. Please try again.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -146,10 +212,18 @@ export default function AddEditPetScreen({ route, navigation }) {
         </Text>
       </View>
 
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>
-          {isEditing ? "Update Pet" : "Create Pet"}
-        </Text>
+      <TouchableOpacity
+        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+        onPress={handleSave}
+        disabled={saving}
+      >
+        {saving ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.saveButtonText}>
+            {isEditing ? "Update Pet" : "Create Pet"}
+          </Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.bottomPadding} />
@@ -160,6 +234,12 @@ export default function AddEditPetScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#f5f5f5",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: "#f5f5f5",
   },
   section: {
@@ -241,6 +321,9 @@ const styles = StyleSheet.create({
     backgroundColor: "#1976d2",
     borderRadius: 8,
     alignItems: "center",
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonText: {
     color: "#fff",

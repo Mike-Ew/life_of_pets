@@ -41,8 +41,11 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Generate JWT
     const secret = process.env.JWT_SECRET || 'your_secret_key_here';
-    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
-    const token = jwt.sign({ id: user.id, email: user.email }, secret, { expiresIn });
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      secret,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
 
     res.status(201).json({
       message: 'User registered successfully',
@@ -93,8 +96,11 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 
     // Generate JWT
     const secret = process.env.JWT_SECRET || 'your_secret_key_here';
-    const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
-    const token = jwt.sign({ id: user.id, email: user.email }, secret, { expiresIn });
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      secret,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
 
     res.json({
       message: 'Login successful',

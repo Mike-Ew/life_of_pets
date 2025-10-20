@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,10 +6,66 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from "react-native";
-import { mockPets } from "../data/mockData";
+import { useAuth } from "../contexts/AuthContext";
+import { petAPI } from "../services/api";
 
 export default function HomeScreen({ navigation }) {
+  const [pets, setPets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const { logout } = useAuth();
+
+  useEffect(() => {
+    loadPets();
+
+    // Add listener to reload pets when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadPets();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadPets = async () => {
+    try {
+      setLoading(true);
+      const data = await petAPI.getAll();
+      setPets(data);
+    } catch (error) {
+      console.error('Error loading pets:', error);
+      Alert.alert('Error', 'Failed to load pets. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadPets();
+    setRefreshing(false);
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', onPress: logout, style: 'destructive' },
+    ]);
+  };
+
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity onPress={handleLogout} style={{ marginRight: 10 }}>
+          <Text style={{ color: '#007AFF', fontSize: 16 }}>Logout</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
   const renderPetCard = ({ item }) => (
     <TouchableOpacity
       style={styles.card}
@@ -17,30 +73,51 @@ export default function HomeScreen({ navigation }) {
         navigation.navigate("PetDetail", { petId: item.id, petName: item.name })
       }
     >
-      <Image source={item.mainPhoto} style={styles.petImage} />
+      {item.main_photo_url ? (
+        <Image source={{ uri: item.main_photo_url }} style={styles.petImage} />
+      ) : (
+        <View style={[styles.petImage, styles.placeholderImage]}>
+          <Text style={styles.placeholderText}>
+            {item.name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      )}
       <View style={styles.petInfo}>
         <Text style={styles.petName}>{item.name}</Text>
         <Text style={styles.petBreed}>
           {item.breed} • {item.age} {item.age === 1 ? "year" : "years"} old
         </Text>
-        <View style={styles.tagsContainer}>
-          {item.temperament_tags.slice(0, 3).map((tag, index) => (
-            <View key={index} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
-            </View>
-          ))}
-        </View>
+        {item.temperament_tags && item.temperament_tags.length > 0 && (
+          <View style={styles.tagsContainer}>
+            {item.temperament_tags.slice(0, 3).map((tag, index) => (
+              <View key={index} style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
 
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
-        data={mockPets}
+        data={pets}
         renderItem={renderPetCard}
         keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={styles.listContainer}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No pets yet</Text>
@@ -65,6 +142,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+  },
   listContainer: {
     padding: 16,
   },
@@ -84,6 +167,16 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     resizeMode: "cover",
+  },
+  placeholderImage: {
+    backgroundColor: "#e0e0e0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderText: {
+    fontSize: 48,
+    fontWeight: "bold",
+    color: "#999",
   },
   petInfo: {
     flex: 1,

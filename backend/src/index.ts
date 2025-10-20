@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging
-app.use((req, res, next) => {
+app.use((req, _res, next) => {
   console.log(`${req.method} ${req.path}`);
   next();
 });
@@ -32,17 +32,17 @@ app.use('/api/pets', careRoutes);
 app.patch('/api/care/events/:id', authenticateToken, updateCareEvent);
 
 // Health check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // 404 handler
-app.use((req, res) => {
+app.use((_req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
 // Error handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Error:', err);
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });

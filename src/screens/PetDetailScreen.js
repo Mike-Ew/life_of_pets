@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -6,19 +6,66 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
-import {
-  mockPets,
-  mockCareToday,
-  mockCareUpcoming,
-  mockCareLogs,
-} from "../data/mockData";
+import { petAPI, careAPI } from "../services/api";
 
 export default function PetDetailScreen({ route, navigation }) {
   const { petId } = route.params;
-  const pet = mockPets.find((p) => p.id === petId);
+  const [pet, setPet] = useState(null);
   const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState(true);
+  const [careToday, setCareToday] = useState([]);
+  const [careUpcoming, setCareUpcoming] = useState([]);
+  const [careLogs, setCareLogs] = useState([]);
+
+  useEffect(() => {
+    loadPetDetails();
+  }, [petId]);
+
+  useEffect(() => {
+    if (activeTab === "care" && pet) {
+      loadCareData();
+    }
+  }, [activeTab, pet]);
+
+  const loadPetDetails = async () => {
+    try {
+      setLoading(true);
+      const petData = await petAPI.getById(petId);
+      setPet(petData);
+    } catch (error) {
+      console.error('Error loading pet:', error);
+      Alert.alert('Error', 'Failed to load pet details');
+      navigation.goBack();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCareData = async () => {
+    try {
+      const [today, upcoming, logs] = await Promise.all([
+        careAPI.getTodayTasks(petId),
+        careAPI.getUpcomingEvents(petId),
+        careAPI.getLogs(petId),
+      ]);
+      setCareToday(today);
+      setCareUpcoming(upcoming);
+      setCareLogs(logs);
+    } catch (error) {
+      console.error('Error loading care data:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   if (!pet) {
     return (
@@ -30,10 +77,20 @@ export default function PetDetailScreen({ route, navigation }) {
 
   const renderOverviewTab = () => (
     <ScrollView style={styles.tabContent}>
-      <Image source={pet.mainPhoto} style={styles.mainImage} />
+      {pet.main_photo_url ? (
+        <Image source={{ uri: pet.main_photo_url }} style={styles.mainImage} />
+      ) : (
+        <View style={[styles.mainImage, styles.placeholderMainImage]}>
+          <Text style={styles.placeholderMainText}>
+            {pet.name.charAt(0).toUpperCase()}
+          </Text>
+        </View>
+      )}
       <View style={styles.infoSection}>
         <Text style={styles.sectionTitle}>About {pet.name}</Text>
-        <Text style={styles.description}>{pet.description}</Text>
+        <Text style={styles.description}>
+          {pet.description || "No description available"}
+        </Text>
 
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Breed:</Text>
@@ -46,32 +103,42 @@ export default function PetDetailScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Temperament</Text>
-        <View style={styles.tagsContainer}>
-          {pet.temperament_tags.map((tag, index) => (
-            <View key={index} style={styles.tag}>
-              <Text style={styles.tagText}>{tag}</Text>
+        {pet.temperament_tags && pet.temperament_tags.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Temperament</Text>
+            <View style={styles.tagsContainer}>
+              {pet.temperament_tags.map((tag, index) => (
+                <View key={index} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
+          </>
+        )}
       </View>
     </ScrollView>
   );
 
   const renderPhotosTab = () => (
     <ScrollView style={styles.tabContent}>
-      <View style={styles.photoGrid}>
-        {pet.photos.map((photo) => (
-          <View key={photo.id} style={styles.photoContainer}>
-            <Image source={photo.url} style={styles.gridPhoto} />
-            {photo.is_main && (
-              <View style={styles.mainBadge}>
-                <Text style={styles.mainBadgeText}>Main</Text>
-              </View>
-            )}
-          </View>
-        ))}
-      </View>
+      {pet.photos && pet.photos.length > 0 ? (
+        <View style={styles.photoGrid}>
+          {pet.photos.map((photo) => (
+            <View key={photo.id} style={styles.photoContainer}>
+              <Image source={{ uri: photo.photo_url }} style={styles.gridPhoto} />
+              {photo.is_main && (
+                <View style={styles.mainBadge}>
+                  <Text style={styles.mainBadgeText}>Main</Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      ) : (
+        <View style={styles.emptyPhotos}>
+          <Text style={styles.emptyText}>No photos yet</Text>
+        </View>
+      )}
       <TouchableOpacity style={styles.uploadButton}>
         <Text style={styles.uploadButtonText}>+ Add Photos</Text>
       </TouchableOpacity>
@@ -83,46 +150,61 @@ export default function PetDetailScreen({ route, navigation }) {
       {/* Today Section */}
       <View style={styles.careSection}>
         <Text style={styles.careSectionTitle}>Today</Text>
-        {mockCareToday.map((item) => (
-          <View key={item.id} style={styles.careItem}>
-            <View style={styles.careItemLeft}>
-              <Text style={styles.careItemTitle}>{item.title}</Text>
-              <Text style={styles.careItemTime}>{item.time}</Text>
+        {careToday.length > 0 ? (
+          careToday.map((item) => (
+            <View key={item.id} style={styles.careItem}>
+              <View style={styles.careItemLeft}>
+                <Text style={styles.careItemTitle}>{item.care_type}</Text>
+                <Text style={styles.careItemTime}>{new Date(item.scheduled_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.doneButton}
+                onPress={() => handleMarkDone(item.id)}
+              >
+                <Text style={styles.doneButtonText}>Done</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.doneButton}>
-              <Text style={styles.doneButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No tasks for today</Text>
+        )}
       </View>
 
       {/* Upcoming Section */}
       <View style={styles.careSection}>
         <Text style={styles.careSectionTitle}>Upcoming (7-14 days)</Text>
-        {mockCareUpcoming.map((item) => (
-          <View key={item.id} style={styles.careItem}>
-            <View style={styles.careItemLeft}>
-              <Text style={styles.careItemTitle}>{item.title}</Text>
-              <Text style={styles.careItemTime}>Due: {item.dueDate}</Text>
+        {careUpcoming.length > 0 ? (
+          careUpcoming.map((item) => (
+            <View key={item.id} style={styles.careItem}>
+              <View style={styles.careItemLeft}>
+                <Text style={styles.careItemTitle}>{item.care_type}</Text>
+                <Text style={styles.careItemTime}>Due: {new Date(item.scheduled_time).toLocaleDateString()}</Text>
+              </View>
+              <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.care_type) }]}>
+                <Text style={styles.typeBadgeText}>{item.care_type}</Text>
+              </View>
             </View>
-            <View style={[styles.typeBadge, { backgroundColor: getTypeColor(item.type) }]}>
-              <Text style={styles.typeBadgeText}>{item.type}</Text>
-            </View>
-          </View>
-        ))}
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No upcoming events</Text>
+        )}
       </View>
 
       {/* Log Section */}
       <View style={styles.careSection}>
         <Text style={styles.careSectionTitle}>History</Text>
-        {mockCareLogs.map((item) => (
-          <View key={item.id} style={styles.logItem}>
-            <Text style={styles.logTitle}>{item.title}</Text>
-            <Text style={styles.logValue}>{item.value}</Text>
-            <Text style={styles.logDate}>{item.occurred_at}</Text>
-            {item.notes && <Text style={styles.logNotes}>{item.notes}</Text>}
-          </View>
-        ))}
+        {careLogs.length > 0 ? (
+          careLogs.map((item) => (
+            <View key={item.id} style={styles.logItem}>
+              <Text style={styles.logTitle}>{item.care_type}</Text>
+              {item.value && <Text style={styles.logValue}>{item.value}</Text>}
+              <Text style={styles.logDate}>{new Date(item.occurred_at).toLocaleString()}</Text>
+              {item.notes && <Text style={styles.logNotes}>{item.notes}</Text>}
+            </View>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No history yet</Text>
+        )}
       </View>
 
       <TouchableOpacity style={styles.quickAddButton}>
@@ -130,6 +212,17 @@ export default function PetDetailScreen({ route, navigation }) {
       </TouchableOpacity>
     </ScrollView>
   );
+
+  const handleMarkDone = async (eventId) => {
+    try {
+      await careAPI.updateEvent(eventId, true, '');
+      Alert.alert('Success', 'Task marked as done!');
+      loadCareData(); // Reload care data
+    } catch (error) {
+      console.error('Error marking done:', error);
+      Alert.alert('Error', 'Failed to mark task as done');
+    }
+  };
 
   const getTypeColor = (type) => {
     const colors = {
@@ -199,6 +292,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f5f5f5",
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f5f5f5",
+  },
   tabBar: {
     flexDirection: "row",
     backgroundColor: "#fff",
@@ -229,6 +328,26 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 300,
     resizeMode: "cover",
+  },
+  placeholderMainImage: {
+    backgroundColor: "#e0e0e0",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  placeholderMainText: {
+    fontSize: 80,
+    fontWeight: "bold",
+    color: "#999",
+  },
+  emptyText: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  emptyPhotos: {
+    padding: 40,
   },
   infoSection: {
     padding: 20,

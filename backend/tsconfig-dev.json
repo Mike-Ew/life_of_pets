@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "ts-node": {
+    "transpileOnly": true,
+    "compilerOptions": {
+      "noUnusedLocals": false,
+      "noUnusedParameters": false
+    }
+  }
+}
