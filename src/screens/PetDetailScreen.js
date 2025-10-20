@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { petAPI, careAPI } from "../services/api";
 
 export default function PetDetailScreen({ route, navigation }) {
@@ -19,6 +20,7 @@ export default function PetDetailScreen({ route, navigation }) {
   const [careToday, setCareToday] = useState([]);
   const [careUpcoming, setCareUpcoming] = useState([]);
   const [careLogs, setCareLogs] = useState([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   useEffect(() => {
     loadPetDetails();
@@ -124,23 +126,52 @@ export default function PetDetailScreen({ route, navigation }) {
       {pet.photos && pet.photos.length > 0 ? (
         <View style={styles.photoGrid}>
           {pet.photos.map((photo) => (
-            <View key={photo.id} style={styles.photoContainer}>
-              <Image source={{ uri: photo.photo_url }} style={styles.gridPhoto} />
+            <TouchableOpacity
+              key={photo.id}
+              style={styles.photoContainer}
+              onLongPress={() => {
+                if (!photo.is_main) {
+                  Alert.alert(
+                    "Set Main Photo",
+                    "Set this as the main photo for " + pet.name + "?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      {
+                        text: "Set as Main",
+                        onPress: () => handleSetMainPhoto(photo.id),
+                      },
+                    ]
+                  );
+                }
+              }}
+            >
+              <Image source={{ uri: photo.url }} style={styles.gridPhoto} />
               {photo.is_main && (
                 <View style={styles.mainBadge}>
                   <Text style={styles.mainBadgeText}>Main</Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       ) : (
         <View style={styles.emptyPhotos}>
           <Text style={styles.emptyText}>No photos yet</Text>
+          <Text style={styles.emptySubtext}>
+            Tap the button below to add your first photo
+          </Text>
         </View>
       )}
-      <TouchableOpacity style={styles.uploadButton}>
-        <Text style={styles.uploadButtonText}>+ Add Photos</Text>
+      <TouchableOpacity
+        style={styles.uploadButton}
+        onPress={handlePickImage}
+        disabled={uploadingPhoto}
+      >
+        {uploadingPhoto ? (
+          <ActivityIndicator size="small" color="#1976d2" />
+        ) : (
+          <Text style={styles.uploadButtonText}>+ Add Photos</Text>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -232,6 +263,74 @@ export default function PetDetailScreen({ route, navigation }) {
       medication: "#f44336",
     };
     return colors[type] || "#9e9e9e";
+  };
+
+  const handlePickImage = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Required",
+          "Please allow access to your photo library to upload photos."
+        );
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await handleUploadPhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
+  };
+
+  const handleUploadPhoto = async (imageUri) => {
+    try {
+      setUploadingPhoto(true);
+
+      // For now, we'll use the local URI directly
+      // In production, you'd upload to a cloud storage service (S3, Cloudinary, etc.)
+      const isFirstPhoto = !pet.photos || pet.photos.length === 0;
+
+      await petAPI.uploadPhoto(petId, imageUri, isFirstPhoto);
+
+      Alert.alert("Success", "Photo uploaded successfully!");
+
+      // Reload pet details to show new photo
+      await loadPetDetails();
+    } catch (error) {
+      console.error("Error uploading photo:", error);
+      Alert.alert(
+        "Upload Failed",
+        error.response?.data?.error || "Failed to upload photo. Please try again."
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleSetMainPhoto = async (photoId) => {
+    try {
+      await petAPI.setMainPhoto(photoId);
+      Alert.alert("Success", "Main photo updated!");
+
+      // Reload pet details
+      await loadPetDetails();
+    } catch (error) {
+      console.error("Error setting main photo:", error);
+      Alert.alert("Error", "Failed to set main photo");
+    }
   };
 
   return (
@@ -348,6 +447,12 @@ const styles = StyleSheet.create({
   },
   emptyPhotos: {
     padding: 40,
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: "#bbb",
+    textAlign: "center",
+    marginTop: 8,
   },
   infoSection: {
     padding: 20,

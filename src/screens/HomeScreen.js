@@ -23,7 +23,7 @@ export default function HomeScreen({ navigation }) {
     loadPets();
 
     // Add listener to reload pets when screen comes into focus
-    const unsubscribe = navigation.addListener('focus', () => {
+    const unsubscribe = navigation.addListener("focus", () => {
       loadPets();
     });
 
@@ -36,8 +36,11 @@ export default function HomeScreen({ navigation }) {
       const data = await petAPI.getAll();
       setPets(data);
     } catch (error) {
-      console.error('Error loading pets:', error);
-      Alert.alert('Error', 'Failed to load pets. Please try again.');
+      // Don't log expected errors (401 handled by auth, others by interceptor)
+      // Only show error if it's not a 401 (auth will handle that)
+      if (error.response?.status !== 401) {
+        Alert.alert("Error", "Failed to load pets. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -50,9 +53,9 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', onPress: logout, style: 'destructive' },
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Logout", onPress: logout, style: "destructive" },
     ]);
   };
 
@@ -60,7 +63,7 @@ export default function HomeScreen({ navigation }) {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity onPress={handleLogout} style={{ marginRight: 10 }}>
-          <Text style={{ color: '#007AFF', fontSize: 16 }}>Logout</Text>
+          <Text style={{ color: "#007AFF", fontSize: 16 }}>Logout</Text>
         </TouchableOpacity>
       ),
     });

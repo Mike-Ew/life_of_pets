@@ -1,5 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { authAPI } from '../services/api';
+import React, { createContext, useState, useEffect, useContext } from "react";
+import { authAPI } from "../services/api";
 
 const AuthContext = createContext({});
 
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
         setUser(currentUser);
       }
     } catch (error) {
-      console.error('Error checking auth:', error);
+      console.error("Error checking auth:", error);
       setIsAuthenticated(false);
       setUser(null);
     } finally {
@@ -38,10 +38,10 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return { success: true, user: data.user };
     } catch (error) {
-      console.error('Login error:', error);
+      // Don't log expected auth failures (already handled by interceptor)
       return {
         success: false,
-        error: error.response?.data?.error || 'Failed to login',
+        error: error.response?.data?.error || "Failed to login",
       };
     }
   };
@@ -53,10 +53,10 @@ export const AuthProvider = ({ children }) => {
       setIsAuthenticated(true);
       return { success: true, user: data.user };
     } catch (error) {
-      console.error('Register error:', error);
+      // Don't log expected auth failures (already handled by interceptor)
       return {
         success: false,
-        error: error.response?.data?.error || 'Failed to register',
+        error: error.response?.data?.error || "Failed to register",
       };
     }
   };
@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null);
       setIsAuthenticated(false);
     } catch (error) {
-      console.error('Logout error:', error);
+      console.error("Logout error:", error);
     }
   };
 
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };

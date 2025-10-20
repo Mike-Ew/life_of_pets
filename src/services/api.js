@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios from "axios";
 
 // Temporary in-memory storage for development
 // TODO: Replace with AsyncStorage after fixing native build issues
@@ -21,19 +21,19 @@ const AsyncStorage = inMemoryStorage;
 // For iOS Simulator: localhost works
 // For Android Emulator: use 10.0.2.2
 // For physical device: use your computer's local IP (e.g., 192.168.1.x)
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = "http://localhost:3000/api";
 
 const api = axios.create({
   baseURL: BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 // Add token to requests automatically
 api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('authToken');
+    const token = await AsyncStorage.getItem("authToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -44,43 +44,60 @@ api.interceptors.request.use(
   }
 );
 
+// Handle response errors gracefully
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Don't log expected errors to console (reduces red banner noise)
+    const status = error.response?.status;
+    const expectedErrors = [400, 401, 403, 404, 409]; // Bad request, Unauthorized, Forbidden, Not found, Conflict
+
+    if (!expectedErrors.includes(status)) {
+      // Only log unexpected errors (500, network errors, etc.)
+      console.error("API Error:", error.message);
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 // Authentication APIs
 export const authAPI = {
   register: async (email, password, name, location) => {
-    const response = await api.post('/auth/register', {
+    const response = await api.post("/auth/register", {
       email,
       password,
       name,
       location,
     });
     if (response.data.token) {
-      await AsyncStorage.setItem('authToken', response.data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+      await AsyncStorage.setItem("authToken", response.data.token);
+      await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
     }
     return response.data;
   },
 
   login: async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
+    const response = await api.post("/auth/login", { email, password });
     if (response.data.token) {
-      await AsyncStorage.setItem('authToken', response.data.token);
-      await AsyncStorage.setItem('user', JSON.stringify(response.data.user));
+      await AsyncStorage.setItem("authToken", response.data.token);
+      await AsyncStorage.setItem("user", JSON.stringify(response.data.user));
     }
     return response.data;
   },
 
   logout: async () => {
-    await AsyncStorage.removeItem('authToken');
-    await AsyncStorage.removeItem('user');
+    await AsyncStorage.removeItem("authToken");
+    await AsyncStorage.removeItem("user");
   },
 
   getCurrentUser: async () => {
-    const userString = await AsyncStorage.getItem('user');
+    const userString = await AsyncStorage.getItem("user");
     return userString ? JSON.parse(userString) : null;
   },
 
   isAuthenticated: async () => {
-    const token = await AsyncStorage.getItem('authToken');
+    const token = await AsyncStorage.getItem("authToken");
     return !!token;
   },
 };
@@ -88,7 +105,7 @@ export const authAPI = {
 // Pet APIs
 export const petAPI = {
   getAll: async () => {
-    const response = await api.get('/pets');
+    const response = await api.get("/me/pets");
     return response.data.pets || [];
   },
 
@@ -98,7 +115,7 @@ export const petAPI = {
   },
 
   create: async (petData) => {
-    const response = await api.post('/pets', petData);
+    const response = await api.post("/pets", petData);
     return response.data.pet;
   },
 
@@ -112,25 +129,21 @@ export const petAPI = {
     return response.data;
   },
 
-  uploadPhoto: async (petId, photoUri) => {
-    const formData = new FormData();
-    formData.append('photo', {
-      uri: photoUri,
-      type: 'image/jpeg',
-      name: 'photo.jpg',
-    });
-
-    const response = await api.post(`/pets/${petId}/photos`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
+  uploadPhoto: async (petId, photoUri, isMain = false) => {
+    // For development, we send the URI directly
+    // In production, you would upload to cloud storage first
+    const response = await api.post(`/pets/${petId}/photos`, {
+      url: photoUri,
+      is_main: isMain,
     });
     return response.data.photo;
   },
 
-  setMainPhoto: async (petId, photoId) => {
-    const response = await api.patch(`/pets/${petId}/photos/${photoId}/main`);
-    return response.data.pet;
+  setMainPhoto: async (photoId) => {
+    const response = await api.patch(`/pet_photos/${photoId}`, {
+      is_main: true
+    });
+    return response.data.photo;
   },
 };
 
@@ -143,17 +156,25 @@ export const careAPI = {
   },
 
   createTemplate: async (petId, templateData) => {
-    const response = await api.post(`/pets/${petId}/care/templates`, templateData);
+    const response = await api.post(
+      `/pets/${petId}/care/templates`,
+      templateData
+    );
     return response.data.template;
   },
 
   updateTemplate: async (petId, templateId, templateData) => {
-    const response = await api.put(`/pets/${petId}/care/templates/${templateId}`, templateData);
+    const response = await api.put(
+      `/pets/${petId}/care/templates/${templateId}`,
+      templateData
+    );
     return response.data.template;
   },
 
   deleteTemplate: async (petId, templateId) => {
-    const response = await api.delete(`/pets/${petId}/care/templates/${templateId}`);
+    const response = await api.delete(
+      `/pets/${petId}/care/templates/${templateId}`
+    );
     return response.data;
   },
 
@@ -169,7 +190,10 @@ export const careAPI = {
   },
 
   updateEvent: async (eventId, completed, notes) => {
-    const response = await api.patch(`/care/events/${eventId}`, { completed, notes });
+    const response = await api.patch(`/care/events/${eventId}`, {
+      completed,
+      notes,
+    });
     return response.data.event;
   },
 
