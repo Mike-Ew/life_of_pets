@@ -8,10 +8,14 @@
 
 ## 🔖 Version & Status
 
-| Module       | Version | Status      | Owner       |
-| ------------ | ------- | ----------- | ----------- |
-| Pet Profiles | 1.0     | In Progress | Frontend/BE |
-| Pet Care     | 0.9     | Planned     | Full Stack  |
+| Module             | Version | Status        | Owner       |
+| ------------------ | ------- | ------------- | ----------- |
+| Backend API        | 1.0     | ✅ Complete   | Backend     |
+| Frontend Auth      | 1.0     | ✅ Complete   | Frontend    |
+| Pet Profiles (MVP) | 1.0     | ✅ Complete   | Full Stack  |
+| Pet Care (View)    | 0.8     | ✅ Complete   | Frontend    |
+| Pet Care (Create)  | 0.5     | Planned       | Full Stack  |
+| iOS Setup          | 1.0     | ✅ Complete   | DevOps      |
 
 ---
 
@@ -246,3 +250,72 @@ TABLE care_logs (
 - Storage: S3 (recommended) or local `/uploads`
 - Validations: Ownership checks on all `:id` resources
 - Testing: Unit (BE), light E2E for checklist flow
+
+---
+
+## ✅ Completed Features (As of October 2025)
+
+### Backend API (Complete)
+
+- ✅ PostgreSQL database setup with all tables
+- ✅ TypeScript backend with Express
+- ✅ JWT authentication (register, login)
+- ✅ User management with password hashing (bcrypt)
+- ✅ Complete Pet CRUD operations
+- ✅ Care tracking endpoints (templates, events, logs)
+- ✅ Photo upload endpoints (ready for frontend integration)
+- ✅ CORS configuration for mobile app
+- ✅ Hot reload development environment (ts-node-dev)
+
+### Frontend - Authentication (Complete)
+
+- ✅ Login screen with email/password
+- ✅ Registration screen with validation
+- ✅ AuthContext for global state management
+- ✅ Automatic JWT token injection in API requests
+- ✅ Session management (in-memory for development)
+- ✅ Conditional navigation (auth vs app stacks)
+- ✅ Logout functionality
+
+### Frontend - Pet Profiles (Complete)
+
+- ✅ Home screen with pet list from API
+- ✅ Create new pet form
+- ✅ Edit existing pet
+- ✅ View pet details (Overview tab)
+- ✅ Pull-to-refresh on home screen
+- ✅ Delete pet functionality
+- ✅ Temperament tag selection
+- ✅ Placeholder images for pets without photos
+
+### Frontend - Pet Care (View Only - Complete)
+
+- ✅ Care tab with Today/Upcoming/History sections
+- ✅ Display today's care tasks from API
+- ✅ Show upcoming care events
+- ✅ View care history logs
+- ✅ Mark tasks as completed
+- ✅ Integration with care_events and care_logs APIs
+
+### iOS Development Setup (Complete)
+
+- ✅ App runs successfully in iOS Simulator
+- ✅ Created index.js entry point
+- ✅ Expo Metro bundler configuration
+- ✅ In-memory storage solution (temporary workaround)
+- ✅ Hot reload working in development
+
+### Known Current Limitations
+
+1. **Session Persistence**: Sessions don't persist between app restarts (in-memory storage)
+2. **Photo Upload UI**: Backend ready, frontend UI not implemented yet
+3. **Care Template Creation**: Can view care data but not create templates from UI
+4. **Native Build**: iOS native build with AsyncStorage deferred due to Xcode issues
+
+### Next Priority Tasks
+
+1. Implement persistent storage (migrate from in-memory to AsyncStorage)
+2. Build UI for creating care templates
+3. Implement photo upload from mobile device
+4. Add photo gallery view with set main photo functionality
+5. Create care event management UI (create, edit, delete schedules)

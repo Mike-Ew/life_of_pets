@@ -4,24 +4,46 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a React Native mobile application built with Expo for tracking pet care activities. The app is in early development stages and currently displays project requirements and goals. The planned features include:
+This is a full-stack React Native mobile application built with Expo for tracking pet care activities. The app features a Node.js + TypeScript backend with PostgreSQL database, and a React Native frontend with complete authentication and pet management capabilities.
 
-- Creating and managing feeding schedules for pets
-- Recording vaccination information (date and vaccine type)
-- Tracking other events (vet visits, grooming appointments) with notes
-- Displaying a list of all pets with ability to add new ones
+**Current Status**: MVP features are implemented and functional. The app is running successfully in iOS Simulator with full backend integration.
+
+### Implemented Features
+
+- **Authentication**: User registration, login, logout with JWT tokens
+- **Pet Profiles**: Complete CRUD operations for pet management
+- **Pet Care Tracking**: View daily tasks, upcoming events, and care history
+- **Photo Management**: Backend endpoints ready (UI pending)
+- **iOS Development**: Running in simulator with Metro bundler
 
 ## Technology Stack
 
+### Frontend
+
 - **Framework**: React Native 0.81.4 with React 19.1.0
 - **Platform**: Expo ~54.0.13 (with new architecture enabled)
-- **Development**: Expo Dev Client for custom native code
+- **Development**: Expo Dev Client with Metro bundler
+- **Navigation**: React Navigation (Native Stack + Bottom Tabs)
+- **State Management**: React Context API (AuthContext)
+- **HTTP Client**: Axios with JWT token injection
+- **Storage**: In-memory storage (temporary, will migrate to AsyncStorage)
 - **Entry Point**: `index.js` (registers the root component)
 - **Main Component**: `App.js`
 
+### Backend
+
+- **Runtime**: Node.js with TypeScript
+- **Framework**: Express.js
+- **Database**: PostgreSQL
+- **ORM**: Direct SQL queries with pg library
+- **Authentication**: JWT with bcrypt password hashing
+- **Development**: ts-node-dev for hot reloading
+- **Port**: 3000
+
 ## Development Commands
 
-**Starting the app**:
+### Frontend
+
 ```bash
 npm start              # Start Expo development server
 npm run android        # Run on Android emulator/device
@@ -29,17 +51,70 @@ npm run ios           # Run on iOS simulator/device
 npm run web           # Run in web browser
 ```
 
-Note: There are no test, lint, or build commands configured yet in this early-stage project.
+### Backend
+
+```bash
+cd backend
+npm run dev           # Start backend server with hot reload (port 3000)
+```
+
+### Running Both (Recommended)
+
+Open two terminal windows:
+
+1. Terminal 1: `cd backend && npm run dev` (starts backend on port 3000)
+2. Terminal 2: `npx expo start` (starts frontend, press 'i' for iOS)
+
+Note: There are no test, lint, or build commands configured yet.
 
 ## Architecture
 
-The project is currently in the prototype/planning phase with a simple single-component structure:
+The project follows a full-stack architecture with clear separation between frontend and backend:
 
-- `index.js` - Expo entry point that registers the App component
-- `App.js` - Main application component displaying project requirements
-- `app.json` - Expo configuration (bundle identifiers, icons, splash screen, orientation)
-- `docs/` - Contains architecture diagrams (Architecture1.png, Architecture2.png)
-- `assets/` - Contains app icons, splash screens, and pet pictures
+### Frontend Structure
+
+```
+/
+├── index.js                    # Expo entry point
+├── App.js                      # Root component with AuthProvider
+├── src/
+│   ├── contexts/
+│   │   └── AuthContext.js      # Global auth state
+│   ├── navigation/
+│   │   └── AppNavigator.js     # Auth/App stack routing
+│   ├── screens/
+│   │   ├── LoginScreen.js
+│   │   ├── RegisterScreen.js
+│   │   ├── HomeScreen.js
+│   │   ├── PetDetailScreen.js
+│   │   └── AddEditPetScreen.js
+│   └── services/
+│       └── api.js              # Axios client + API methods
+├── assets/                     # Icons, splash screens, images
+└── docs/                       # Architecture diagrams & documentation
+```
+
+### Backend Structure
+
+```
+backend/
+├── src/
+│   ├── index.ts                # Express app entry point
+│   ├── config/
+│   │   └── database.ts         # PostgreSQL connection pool
+│   ├── controllers/
+│   │   ├── authController.ts   # Register, login
+│   │   ├── petController.ts    # Pet CRUD
+│   │   └── careController.ts   # Care tracking
+│   ├── middleware/
+│   │   └── auth.ts             # JWT verification
+│   └── routes/
+│       ├── authRoutes.ts
+│       ├── petRoutes.ts
+│       └── careRoutes.ts
+├── schema.sql                  # Database schema
+└── .env                        # Environment variables
+```
 
 ### Expo Configuration
 
@@ -82,9 +157,37 @@ This project uses multiple AI assistants (Claude, Gemini). The `/docs/ai/` folde
 - **Document decisions** in `decisions.md` when making architectural choices
 - **Optional**: Add detailed notes to `/docs/ai/work-logs/claude/`
 
-## Development Notes
+## Important Implementation Notes
 
-- The app uses inline styles with `StyleSheet.create` following standard React Native conventions
+### Storage Solution (Temporary)
+
+The app currently uses an **in-memory storage wrapper** instead of AsyncStorage:
+
+- **File**: `src/services/api.js:5-18`
+- **Reason**: Native AsyncStorage requires Xcode build which had module resolution errors
+- **Trade-off**: Sessions work during runtime but don't persist between app restarts
+- **Future**: Will migrate to AsyncStorage when native build issues are resolved
+
+### API Configuration
+
+- **Base URL**: `http://localhost:3000/api` (for iOS Simulator)
+- **For Android Emulator**: Change to `10.0.2.2:3000/api`
+- **For Physical Device**: Use your computer's local IP (e.g., `192.168.1.x:3000/api`)
+- **File**: `src/services/api.js:24`
+
+### Database Setup
+
+PostgreSQL database must be running with:
+
+- **Database Name**: `life_of_pets`
+- **Schema**: Located in `backend/schema.sql`
+- **Connection**: Configured in `backend/.env`
+
+### Development Best Practices
+
+- The app uses inline styles with `StyleSheet.create` following React Native conventions
 - Native iOS and Android folders are gitignored as Expo manages them
-- The codebase currently has no navigation, state management, or data persistence implemented
+- Navigation uses React Navigation with conditional auth/app stacks
+- State management via React Context API (AuthContext for global auth state)
+- API calls centralized in `src/services/api.js` with automatic JWT injection
 - The MVP is scoped to Pet Profiles and Pet Care only (matching, chat, notifications deferred)

@@ -190,23 +190,65 @@ npx expo start
 5. **Social Features**: Share pet profiles
 6. **Data Sync**: Offline mode with sync
 
+## iOS Development Setup ✓
+
+### Entry Point Configuration
+- **File**: `index.js` (created at project root)
+- Registers the App component using Expo's `registerRootComponent`
+- Required for proper app initialization in iOS Simulator
+
+### Storage Solution
+- **Approach**: In-memory storage wrapper for development
+- **File**: `src/services/api.js:5-18`
+- **Implementation**: Custom object mimicking AsyncStorage API
+  ```javascript
+  const inMemoryStorage = {
+    storage: {},
+    async getItem(key) { return this.storage[key] || null; },
+    async setItem(key, value) { this.storage[key] = value; },
+    async removeItem(key) { delete this.storage[key]; }
+  };
+  ```
+- **Reason**: Native AsyncStorage requires building with Xcode, which had persistent module resolution errors
+- **Trade-off**: Sessions work perfectly during app runtime but don't persist between app restarts
+- **Future**: Will migrate to real AsyncStorage once native build issues are resolved
+
+### Running the iOS App
+```bash
+# Start Metro bundler (if not already running)
+npx expo start
+
+# In the Expo Dev Tools:
+# Press 'i' for iOS Simulator
+# OR
+# Scan QR code with Expo Go app on physical device
+```
+
+**Note**: The app runs successfully in iOS Simulator using Expo's development client without requiring a native build.
+
 ## Known Limitations
 
-1. **Photos**: Upload functionality not yet implemented (backend ready)
-2. **Care Management**: Only viewing care data, no creation UI yet
-3. **Error Handling**: Basic error messages, could be more specific
-4. **Validation**: Frontend validation basic, backend has more robust checks
-5. **Loading States**: Some transitions could be smoother
+1. **Session Persistence**: Login sessions don't persist between app restarts (due to in-memory storage)
+2. **Native Build**: iOS native build with AsyncStorage has Xcode module resolution issues (deferred)
+3. **Photos**: Upload functionality not yet implemented (backend ready)
+4. **Care Management**: Only viewing care data, no creation UI yet
+5. **Error Handling**: Basic error messages, could be more specific
+6. **Validation**: Frontend validation basic, backend has more robust checks
+7. **Loading States**: Some transitions could be smoother
 
 ## Files Created/Modified
 
 ### New Files
-- `src/services/api.js` - API client and service layer
+
+- `index.js` - Expo app entry point registration
+- `src/services/api.js` - API client and service layer with in-memory storage
 - `src/contexts/AuthContext.js` - Authentication context
 - `src/screens/LoginScreen.js` - Login UI
 - `src/screens/RegisterScreen.js` - Registration UI
+- `INTEGRATION_COMPLETE.md` - This documentation file
 
 ### Modified Files
+
 - `App.js` - Added AuthProvider wrapper
 - `src/navigation/AppNavigator.js` - Conditional auth/app stacks
 - `src/screens/HomeScreen.js` - API integration, pull-to-refresh
