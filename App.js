@@ -1,95 +1,63 @@
-import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View, ScrollView } from "react-native";
+// src/App.jsx
 
-export default function App() {
+import React, { useState } from 'react';
+import { NativeRouter, Routes, Route, Navigate } from 'react-router-native';
+import { View, StyleSheet } from 'react-native';
+
+// Import your screen components
+import AuthScreen from './src/pages/AuthScreen';
+import LoginScreen from './src/pages/LoginScreen';
+import SignUpScreen from './src/pages/SignUpScreen';
+import Dashboard from './src/pages/Dashboard';
+import PetProfile from './src/pages/PetProfile';
+import LogActivityScreen from './src/pages/LogActivityScreen';
+
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  const handleLogin = () => {
+    // API call would go here
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+  };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Pet Care Mobile Application</Text>
+    <NativeRouter>
+      <View style={styles.container}>
+        <Routes>
+          {/* Public Routes (if user is NOT logged in) */}
+          {!isLoggedIn ? (
+            <>
+              <Route path="/" element={<AuthScreen />} />
+              <Route path="/login" element={<LoginScreen onLogin={handleLogin} />} />
+              <Route path="/signup" element={<SignUpScreen />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          ) : (
+            /* Private Routes (if user IS logged in) */
+            <>
+              <Route
+                path="/dashboard"
+                element={<Dashboard onLogout={handleLogout} />}
+              />
+              <Route path="/pet/:id" element={<PetProfile />} />
+              <Route path="/log-activity" element={<LogActivityScreen />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </>
+          )}
+        </Routes>
       </View>
-
-      <ScrollView style={styles.content}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Project Description</Text>
-          <Text style={styles.cardText}>
-            In this project, you will develop a mobile application for tracking
-            pet care activities, including feeding, vaccinations, and other
-            information related to care of pets.
-          </Text>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Requirements</Text>
-          <Text style={styles.bulletPoint}>
-            • A feeding schedule can be created for a pet, with the ability to
-            add and edit meals.
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • Vaccination information for a pet can be recorded, such as the
-            date and type of vaccine.
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • Other events, like vet visits and grooming appointments, can be
-            tracked with notes.
-          </Text>
-          <Text style={styles.bulletPoint}>
-            • A list of all pets is displayed, with the option to add a new pet.
-          </Text>
-        </View>
-      </ScrollView>
-
-      <StatusBar style="auto" />
-    </View>
+    </NativeRouter>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  header: {
-    backgroundColor: "#fff",
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e0e0e0",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 12,
-  },
-  cardText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#333",
-  },
-  bulletPoint: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "#333",
-    marginBottom: 8,
   },
 });
+
+export default App;
