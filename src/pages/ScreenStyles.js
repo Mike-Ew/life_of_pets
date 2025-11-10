@@ -19,8 +19,6 @@ export const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     backgroundColor: '#f0f4f8',
-    padding: 16,
-    justifyContent: 'center',
     alignItems: 'center',
   },
   contentBox: {
@@ -118,68 +116,5 @@ export const styles = StyleSheet.create({
   linkText: {
     color: '#6495ED',
     fontWeight: '600',
-  },
-
-  // --- Dashboard ---
-  dashboardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 24,
-  },
-  dashboardTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  petGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  petCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    width: (width - 48) / 2, // 2 columns with padding
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  petImage: {
-    width: '100%',
-    height: 150,
-  },
-  petName: {
-    fontSize: 18,
-    fontWeight: '600',
-    textAlign: 'center',
-    padding: 16,
-  },
-
-  // --- FAB ('+' Button) ---
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    backgroundColor: '#6495ED',
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabText: {
-    color: 'white',
-    fontSize: 36,
-    lineHeight: 36,
   },
 });

@@ -9,8 +9,7 @@ import AuthScreen from './src/pages/AuthScreen';
 import LoginScreen from './src/pages/LoginScreen';
 import SignUpScreen from './src/pages/SignUpScreen';
 import Dashboard from './src/pages/Dashboard';
-import PetProfile from './src/pages/PetProfile';
-import LogActivityScreen from './src/pages/LogActivityScreen';
+// PetProfile and LogActivityScreen are no longer needed here
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -43,8 +42,7 @@ function App() {
                 path="/dashboard"
                 element={<Dashboard onLogout={handleLogout} />}
               />
-              <Route path="/pet/:id" element={<PetProfile />} />
-              <Route path="/log-activity" element={<LogActivityScreen />} />
+              {/* All other app routes are now handled inside Dashboard.jsx */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </>
           )}
