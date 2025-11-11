@@ -1,27 +1,26 @@
 // src/App.jsx
 
-import React, { useState } from 'react';
+import React from 'react';
 import { NativeRouter, Routes, Route, Navigate } from 'react-router-native';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 
 // Import your screen components
 import AuthScreen from './src/pages/AuthScreen';
 import LoginScreen from './src/pages/LoginScreen';
 import SignUpScreen from './src/pages/SignUpScreen';
 import Dashboard from './src/pages/Dashboard';
-// PetProfile and LogActivityScreen are no longer needed here
 
-function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+function AppNavigator() {
+  const { isLoggedIn, isLoading, logout } = useAuth();
 
-  const handleLogin = () => {
-    // API call would go here
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
-    setIsLoggedIn(false);
-  };
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <ActivityIndicator size="large" color="#FF8A65" />
+      </View>
+    );
+  }
 
   return (
     <NativeRouter>
@@ -31,7 +30,7 @@ function App() {
           {!isLoggedIn ? (
             <>
               <Route path="/" element={<AuthScreen />} />
-              <Route path="/login" element={<LoginScreen onLogin={handleLogin} />} />
+              <Route path="/login" element={<LoginScreen />} />
               <Route path="/signup" element={<SignUpScreen />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
@@ -40,7 +39,7 @@ function App() {
             <>
               <Route
                 path="/dashboard"
-                element={<Dashboard onLogout={handleLogout} />}
+                element={<Dashboard onLogout={logout} />}
               />
               {/* All other app routes are now handled inside Dashboard.jsx */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -52,9 +51,22 @@ function App() {
   );
 }
 
+function App() {
+  return (
+    <AuthProvider>
+      <AppNavigator />
+    </AuthProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  center: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFF8F2',
   },
 });
 

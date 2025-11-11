@@ -1,0 +1,21 @@
+# Core Django
+Django>=5.0,<5.3
+djangorestframework>=3.14.0
+
+# CORS handling for React Native
+django-cors-headers>=4.3.0
+
+# Authentication
+djangorestframework-simplejwt>=5.3.0
+
+# Environment variables
+python-decouple>=3.8
+
+# Image handling
+Pillow>=10.0.0
+
+# API documentation
+drf-spectacular>=0.27.0
+
+# Development tools
+django-extensions>=3.2.0

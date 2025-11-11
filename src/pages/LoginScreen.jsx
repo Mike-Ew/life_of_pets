@@ -1,57 +1,66 @@
 import React, { useState } from 'react';
-// 1. Import ImageBackground
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  Pressable, 
-  ImageBackground // <-- Add this
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  ImageBackground,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigate, Link } from 'react-router-native';
+import { useAuth } from '../contexts/AuthContext';
 import { styles } from './ScreenStyles';
 
-// 2. Define the path to your background image
 const AUTH_BACKGROUND = require('../../assets/Pet Pictures/auth_background.jpg');
 
-function LoginScreen({ onLogin }) {
-  const [email, setEmail] = useState('');
+function LoginScreen() {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const handleSubmit = () => {
-    // --- API CALL ---
-    console.log('Logging in with:', email, password);
-    onLogin();
-    navigate('/dashboard');
+  const handleSubmit = async () => {
+    if (!username || !password) {
+      Alert.alert('Error', 'Please enter both username and password');
+      return;
+    }
+
+    setIsLoading(true);
+    const result = await login(username, password);
+    setIsLoading(false);
+
+    if (result.success) {
+      navigate('/dashboard');
+    } else {
+      Alert.alert('Login Failed', result.error);
+    }
   };
 
   return (
-    // 3. Use ImageBackground instead of the main View
     <ImageBackground
       source={AUTH_BACKGROUND}
       resizeMode="cover"
-      style={styles.background} // Use the style from ScreenStyles.js
+      style={styles.background}
     >
-      {/* 4. Add the overlay for readability */}
       <View style={styles.overlay}>
-
-        {/* This contentBox holds your form */}
         <View style={[styles.contentBox, styles.formBox]}>
           <Text style={styles.formTitle}>Login</Text>
-          
+
           <View style={styles.formGroup}>
             <Text style={styles.label}>Username</Text>
             <TextInput
               style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
+              value={username}
+              onChangeText={setUsername}
               autoCapitalize="none"
-              placeholder="you@example.com"
+              placeholder="Enter your username"
               placeholderTextColor="#999"
+              editable={!isLoading}
             />
           </View>
-          
+
           <View style={styles.formGroup}>
             <Text style={styles.label}>Password</Text>
             <TextInput
@@ -59,16 +68,27 @@ function LoginScreen({ onLogin }) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry
-              placeholder="Your password"
+              placeholder="Enter your password"
               placeholderTextColor="#999"
+              editable={!isLoading}
             />
           </View>
 
           <Pressable
-            style={[styles.btn, styles.btnPrimary, { width: '100%', marginTop: 16 }]}
+            style={[
+              styles.btn,
+              styles.btnPrimary,
+              { width: '100%', marginTop: 16 },
+              isLoading && { opacity: 0.6 }
+            ]}
             onPress={handleSubmit}
+            disabled={isLoading}
           >
-            <Text style={styles.btnPrimaryText}>Login</Text>
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.btnPrimaryText}>Login</Text>
+            )}
           </Pressable>
 
           <Text style={styles.formLink}>
@@ -78,7 +98,6 @@ function LoginScreen({ onLogin }) {
             </Link>
           </Text>
         </View>
-
       </View>
     </ImageBackground>
   );

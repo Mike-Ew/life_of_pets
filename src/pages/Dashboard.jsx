@@ -1,6 +1,6 @@
 // src/pages/Dashboard.jsx
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { StatusBar } from "expo-status-bar";
 import {
   StyleSheet,
@@ -16,60 +16,28 @@ import {
   TextInput,
   ScrollView,
   Switch,
+  ActivityIndicator,
 } from "react-native";
 import PetCard from '../components/PetCard';
 import MenuModal from '../components/MenuModal';
 import ActivityMonitor from '../components/ActivityMonitor';
 import HealthFeeding from '../components/HealthFeeding';
 import Expenses from '../components/Expenses';
+import { petsAPI, eventsAPI } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
-const INITIAL_PETS = [
-  {
-    id: "1",
-    name: "Bella",
-    breed: "Welsh Corgi",
-    age: "3 yrs",
-    personality: "playful",
-    height: "60 cm",
-    weight: "30 kg",
-    image: require("../../assets/Pet Pictures/alvan-nee-eoqnr8ikwFE-unsplash.jpg"),
-  },
-  {
-    id: "2",
-    name: "Draco",
-    breed: "German Shepherd",
-    age: "4 yrs",
-    personality: "calm",
-    height: "65 cm",
-    weight: "35 kg",
-    image: require("../../assets/Pet Pictures/david-lezcano-m-Doa-GTrUw-unsplash.jpg"),
-  },
-  {
-    id: "3",
-    name: "Minx",
-    breed: "Tabby",
-    age: "2 yrs",
-    personality: "curious",
-    height: "40 cm",
-    weight: "12 kg",
-    image: require("../../assets/Pet Pictures/IMG_3229.jpeg"),
-  },
-  {
-    id: "4",
-    name: "Luna",
-    breed: "Golden Retriever",
-    age: "5 yrs",
-    personality: "gentle",
-    height: "45 cm",
-    weight: "10 kg",
-    image: require("../../assets/Pet Pictures/richard-brutyo-Sg3XwuEpybU-unsplash.jpg"),
-  },
+// Fallback images for pets without photos
+const DEFAULT_IMAGES = [
+  require("../../assets/Pet Pictures/alvan-nee-eoqnr8ikwFE-unsplash.jpg"),
+  require("../../assets/Pet Pictures/david-lezcano-m-Doa-GTrUw-unsplash.jpg"),
+  require("../../assets/Pet Pictures/IMG_3229.jpeg"),
+  require("../../assets/Pet Pictures/richard-brutyo-Sg3XwuEpybU-unsplash.jpg"),
 ];
 
 const PERSONALITY_COLORS = {
-  calm: "#C7E7DB", // soft mint
-  playful: "#FFE1B5", // warm sunny
-  curious: "#F7D6E0", // soft pink
+  calm: "#C7E7DB",
+  playful: "#FFE1B5",
+  curious: "#F7D6E0",
   gentle: "#E0E0E0",
 };
 
@@ -102,11 +70,13 @@ const THEMES = {
   }
 };
 
-// Renamed to Dashboard, and accepts onLogout prop
 export default function Dashboard({ onLogout }) {
-  const [pets, setPets] = useState(INITIAL_PETS);
+  const [pets, setPets] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedScreen, setSelectedScreen] = useState("Dashboard");
+  const { user } = useAuth();
 
   // Add Pet modal state
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -114,13 +84,17 @@ export default function Dashboard({ onLogout }) {
   const [formBreed, setFormBreed] = useState("");
   const [formAge, setFormAge] = useState("");
   const [formPersonality, setFormPersonality] = useState("calm");
-  const [formImage, setFormImage] = useState(INITIAL_PETS[0].image);
   const [formHeight, setFormHeight] = useState("");
   const [formWeight, setFormWeight] = useState("");
+  const [formDescription, setFormDescription] = useState("");
+  const [isSavingPet, setIsSavingPet] = useState(false);
 
   // Pet detail modal state
   const [petDetailVisible, setPetDetailVisible] = useState(false);
   const [selectedPet, setSelectedPet] = useState(null);
+
+  const [theme, setTheme] = useState('light');
+  const t = THEMES[theme];
 
   const SCREENS = [
     "Dashboard",
@@ -130,14 +104,122 @@ export default function Dashboard({ onLogout }) {
     "Settings",
   ];
 
+  // Load pets on mount
+  useEffect(() => {
+    loadPets();
+  }, []);
+
+  const loadPets = async () => {
+    try {
+      setIsLoading(true);
+      const data = await petsAPI.getAll();
+
+      // Add default images to pets without photos
+      // Use pet ID for consistent image assignment
+      const petsWithImages = data.map((pet) => {
+        let imageSource;
+
+        if (pet.photos && pet.photos.length > 0) {
+          // Pet has uploaded photos - use the main photo or first one
+          const photoUrl = pet.photos.find(p => p.is_main)?.image || pet.photos[0].image;
+          imageSource = { uri: photoUrl };
+        } else {
+          // No photos - assign a default image based on pet ID
+          const imageIndex = (pet.id - 1) % DEFAULT_IMAGES.length;
+          imageSource = DEFAULT_IMAGES[imageIndex];
+        }
+
+        return {
+          ...pet,
+          image: imageSource
+        };
+      });
+
+      setPets(petsWithImages);
+    } catch (error) {
+      console.error('Error loading pets:', error);
+      Alert.alert('Error', 'Failed to load pets. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadPets();
+    setIsRefreshing(false);
+  };
+
   const onAddPet = () => {
-    // open add pet modal
+    // Reset form
     setFormName("");
     setFormBreed("");
     setFormAge("");
     setFormPersonality("calm");
-    setFormImage(INITIAL_PETS[0].image);
+    setFormHeight("");
+    setFormWeight("");
+    setFormDescription("");
     setAddModalVisible(true);
+  };
+
+  const handleSavePet = async () => {
+    if (!formName.trim()) {
+      Alert.alert('Validation', 'Please enter a pet name');
+      return;
+    }
+
+    try {
+      setIsSavingPet(true);
+      const newPet = await petsAPI.create({
+        name: formName.trim(),
+        breed: formBreed.trim(),
+        age: formAge.trim(),
+        height: formHeight.trim(),
+        weight: formWeight.trim(),
+        personality: formPersonality,
+        description: formDescription.trim(),
+      });
+
+      // Add default image for display
+      const petWithImage = {
+        ...newPet,
+        image: DEFAULT_IMAGES[pets.length % DEFAULT_IMAGES.length]
+      };
+
+      setPets([petWithImage, ...pets]);
+      setAddModalVisible(false);
+      Alert.alert('Success', 'Pet added successfully!');
+    } catch (error) {
+      console.error('Error adding pet:', error);
+      Alert.alert('Error', 'Failed to add pet. Please try again.');
+    } finally {
+      setIsSavingPet(false);
+    }
+  };
+
+  const handleDeletePet = (pet) => {
+    Alert.alert(
+      'Delete Pet',
+      `Are you sure you want to delete ${pet.name}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await petsAPI.delete(pet.id);
+              setPets(pets.filter(p => p.id !== pet.id));
+              setPetDetailVisible(false);
+              Alert.alert('Success', 'Pet deleted successfully');
+            } catch (error) {
+              console.error('Error deleting pet:', error);
+              Alert.alert('Error', 'Failed to delete pet');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const onNavPress = () => {
@@ -149,32 +231,6 @@ export default function Dashboard({ onLogout }) {
     setModalVisible(false);
   };
 
-  // Build sample reminders relative to current time
-  const now = new Date();
-  const makeDate = (daysFromNow, hours = 9) => {
-    const d = new Date(now);
-    d.setDate(now.getDate() + daysFromNow);
-    d.setHours(hours, 0, 0, 0);
-    return d.toISOString();
-  };
-
-  const SAMPLE_REMINDERS = [
-    { id: 'r1', petId: INITIAL_PETS[0].id, title: 'Vaccination reminder', date: makeDate(1, 10) },
-    { id: 'r2', petId: INITIAL_PETS[1].id, title: 'Grooming appointment', date: makeDate(2, 14) },
-    { id: 'r3', petId: INITIAL_PETS[2].id, title: 'Feeding - special diet', date: makeDate(4, 8) },
-  ];
-
-  // Compute reminders occurring in the next 2-3 days
-  const upcomingReminders = SAMPLE_REMINDERS.filter((r) => {
-    const d = new Date(r.date);
-    const cutoff = new Date(now);
-    cutoff.setDate(now.getDate() + 3);
-    return d >= now && d <= cutoff;
-  }).sort((a, b) => new Date(a.date) - new Date(b.date)).map((r) => {
-    const pet = pets.find((p) => p.id === r.petId) || INITIAL_PETS.find((p) => p.id === r.petId) || {};
-    return { ...r, petName: pet.name, petImage: pet.image };
-  });
-
   const openDetail = (pet) => {
     setSelectedPet(pet);
     setPetDetailVisible(true);
@@ -185,8 +241,29 @@ export default function Dashboard({ onLogout }) {
   );
 
   const NUM_COLUMNS = 1;
-  const [theme, setTheme] = useState('light');
-  const t = THEMES[theme];
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: t.background }]}>
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={t.accent} />
+          <Text style={[{ marginTop: 16, color: t.textSecondary }]}>Loading your pets...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Empty state
+  const EmptyState = () => (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+      <Text style={{ fontSize: 48, marginBottom: 16 }}>🐾</Text>
+      <Text style={[styles.placeholderTitle, { color: t.titleText }]}>No Pets Yet</Text>
+      <Text style={[styles.placeholderText, { color: t.textSecondary, textAlign: 'center' }]}>
+        Tap the "+ Add" button above to add your first pet!
+      </Text>
+    </View>
+  );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: t.background }]}>
@@ -195,80 +272,91 @@ export default function Dashboard({ onLogout }) {
           <Text style={[styles.headerIcon, { color: t.textPrimary }]}>☰</Text>
         </TouchableOpacity>
 
-        <Text style={[styles.title, { color: t.titleText }]}>{selectedScreen === "Dashboard" ? "My Pets" : selectedScreen}</Text>
+        <Text style={[styles.title, { color: t.titleText }]}>
+          {selectedScreen === "Dashboard" ? "My Pets" : selectedScreen}
+        </Text>
 
-        <TouchableOpacity onPress={onAddPet} style={styles.headerRight}>
-          <Text style={[styles.addText, { color: t.accent }]}>+ Add</Text>
-        </TouchableOpacity>
+        {selectedScreen === "Dashboard" && (
+          <TouchableOpacity onPress={onAddPet} style={styles.headerRight}>
+            <Text style={[styles.addText, { color: t.accent }]}>+ Add</Text>
+          </TouchableOpacity>
+        )}
+        {selectedScreen !== "Dashboard" && <View style={styles.headerRight} />}
       </View>
 
-      <MenuModal visible={modalVisible} onClose={() => setModalVisible(false)} screens={SCREENS} onSelect={selectScreen} t={t} />
+      <MenuModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        screens={SCREENS}
+        onSelect={selectScreen}
+        t={t}
+      />
 
       {selectedScreen === "Dashboard" ? (
         <FlatList
           data={pets}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => item.id.toString()}
           renderItem={renderPet}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={pets.length === 0 ? { flex: 1 } : styles.list}
           numColumns={NUM_COLUMNS}
-          key={`flatlist-cols-${NUM_COLUMNS}`}
-          ListFooterComponent={() => (
-              <View style={[styles.remindersContainer, { backgroundColor: t.modalBg, borderColor: t.cardShadow }]}>
-                <Text style={[styles.remindersTitle, { color: t.titleText }]}>Upcoming reminders</Text>
-                {upcomingReminders.length === 0 ? (
-                  <Text style={[styles.noRemindersText, { color: t.textSecondary }]}>No reminders in the next few days.</Text>
-                ) : (
-                  upcomingReminders.map((r) => (
-                    <View key={r.id} style={[styles.reminderItem, { borderBottomColor: theme === 'dark' ? '#222' : '#F3E9E6' }]}>
-                      {r.petImage ? <Image source={r.petImage} style={styles.reminderThumb} /> : null}
-                      <View style={styles.reminderBody}>
-                        <Text style={[styles.reminderTitle, { color: t.textPrimary }]}>{r.title}</Text>
-                        <Text style={[styles.reminderPet, { color: t.textSecondary }]}>{r.petName}</Text>
-                      </View>
-                      <Text style={[styles.reminderDate, { color: t.textSecondary }]}>{new Date(r.date).toLocaleString()}</Text>
-                    </View>
-                  ))
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
+          ListEmptyComponent={EmptyState}
+        />
+      ) : selectedScreen === 'Activity Monitor' ? (
+        <ActivityMonitor pets={pets} t={t} />
+      ) : selectedScreen === 'Health & Feeding' ? (
+        <HealthFeeding pets={pets} t={t} />
+      ) : selectedScreen === 'Expenses' ? (
+        <Expenses t={t} />
+      ) : selectedScreen === 'Settings' ? (
+        <View style={[styles.placeholderContainer, { backgroundColor: t.background }]}>
+          <View style={{ width: '100%', paddingHorizontal: 20 }}>
+            <Text style={[styles.menuTitle, { color: t.titleText }]}>Settings</Text>
+
+            {user && (
+              <View style={{ marginTop: 16, marginBottom: 16 }}>
+                <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Account</Text>
+                <Text style={{ color: t.textPrimary, fontSize: 16, marginTop: 4 }}>
+                  {user.username}
+                </Text>
+                {user.email && (
+                  <Text style={{ color: t.textSecondary, fontSize: 14, marginTop: 2 }}>
+                    {user.email}
+                  </Text>
                 )}
               </View>
-          )}
-        />
-      ) : (
-        selectedScreen === 'Activity Monitor' ? (
-          <ActivityMonitor pets={pets} t={t} />
-        ) : selectedScreen === 'Health & Feeding' ? (
-          <HealthFeeding pets={pets} t={t} />
-        ) : selectedScreen === 'Expenses' ? (
-          <Expenses t={t} />
-        ) : selectedScreen === 'Settings' ? (
-          <View style={[styles.placeholderContainer, { backgroundColor: t.background }]}>
-            <View style={{ width: '100%', paddingHorizontal: 20 }}>
-              <Text style={[styles.menuTitle, { color: t.titleText }]}>Settings</Text>
-              <View style={{ marginTop: 12 }}>
-                <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Display</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                  <Text style={{ color: t.textPrimary, fontWeight: '600' }}>Dark mode</Text>
-                  <Switch value={theme === 'dark'} onValueChange={(v) => setTheme(v ? 'dark' : 'light')} thumbColor={t.accent} />
-                </View>
-              </View>
-              
-              {/* --- LOGOUT BUTTON ADDED HERE --- */}
-              <View style={{ marginTop: 24 }}>
-                <TouchableOpacity 
-                  style={[styles.submitButton, { backgroundColor: t.accent }]} 
-                  onPress={onLogout}
-                >
-                  <Text style={styles.submitText}>Logout</Text>
-                </TouchableOpacity>
-              </View>
+            )}
 
+            <View style={{ marginTop: 12 }}>
+              <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Display</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                <Text style={{ color: t.textPrimary, fontWeight: '600' }}>Dark mode</Text>
+                <Switch
+                  value={theme === 'dark'}
+                  onValueChange={(v) => setTheme(v ? 'dark' : 'light')}
+                  thumbColor={t.accent}
+                />
+              </View>
+            </View>
+
+            <View style={{ marginTop: 24 }}>
+              <TouchableOpacity
+                style={[styles.submitButton, { backgroundColor: t.accent }]}
+                onPress={onLogout}
+              >
+                <Text style={styles.submitText}>Logout</Text>
+              </TouchableOpacity>
             </View>
           </View>
-        ) : (
-          <View style={styles.placeholderContainer}>
-            <Text style={[styles.placeholderTitle, { color: t.titleText }]}>{selectedScreen}</Text>
-            <Text style={[styles.placeholderText, { color: t.textSecondary }]}>Placeholder content for {selectedScreen}.</Text>
-          </View>
-        )
+        </View>
+      ) : (
+        <View style={styles.placeholderContainer}>
+          <Text style={[styles.placeholderTitle, { color: t.titleText }]}>{selectedScreen}</Text>
+          <Text style={[styles.placeholderText, { color: t.textSecondary }]}>
+            Coming soon...
+          </Text>
+        </View>
       )}
 
       {/* Pet Detail Modal */}
@@ -278,31 +366,59 @@ export default function Dashboard({ onLogout }) {
         </TouchableWithoutFeedback>
 
         <View style={[styles.detailModalContainer, { backgroundColor: t.modalBg, shadowColor: t.cardShadow }]}>
-          {selectedPet ? (
+          {selectedPet && (
             <View>
               <Image source={selectedPet.image} style={styles.detailImage} />
               <View style={{ padding: 12 }}>
                 <Text style={[styles.menuTitle, { color: t.titleText }]}>{selectedPet.name}</Text>
+
                 <Text style={[styles.detailLabel, { color: t.textSecondary }]}>Breed</Text>
-                <Text style={[styles.detailValue, { color: t.textPrimary }]}>{selectedPet.breed}</Text>
+                <Text style={[styles.detailValue, { color: t.textPrimary }]}>
+                  {selectedPet.breed || '—'}
+                </Text>
 
                 <Text style={[styles.detailLabel, { color: t.textSecondary, marginTop: 8 }]}>Age</Text>
-                <Text style={[styles.detailValue, { color: t.textPrimary }]}>{selectedPet.age}</Text>
+                <Text style={[styles.detailValue, { color: t.textPrimary }]}>
+                  {selectedPet.age || '—'}
+                </Text>
 
                 <Text style={[styles.detailLabel, { color: t.textSecondary, marginTop: 8 }]}>Height</Text>
-                <Text style={[styles.detailValue, { color: t.textPrimary }]}>{selectedPet.height || '—'}</Text>
+                <Text style={[styles.detailValue, { color: t.textPrimary }]}>
+                  {selectedPet.height || '—'}
+                </Text>
 
                 <Text style={[styles.detailLabel, { color: t.textSecondary, marginTop: 8 }]}>Weight</Text>
-                <Text style={[styles.detailValue, { color: t.textPrimary }]}>{selectedPet.weight || '—'}</Text>
+                <Text style={[styles.detailValue, { color: t.textPrimary }]}>
+                  {selectedPet.weight || '—'}
+                </Text>
 
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
-                  <TouchableOpacity style={[styles.cancelButton, { backgroundColor: t.inputBg, borderColor: t.cardShadow }]} onPress={() => setPetDetailVisible(false)}>
+                {selectedPet.description && (
+                  <>
+                    <Text style={[styles.detailLabel, { color: t.textSecondary, marginTop: 8 }]}>Description</Text>
+                    <Text style={[styles.detailValue, { color: t.textPrimary }]}>
+                      {selectedPet.description}
+                    </Text>
+                  </>
+                )}
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
+                  <TouchableOpacity
+                    style={[styles.cancelButton, { backgroundColor: '#FF6B6B', borderColor: '#FF6B6B' }]}
+                    onPress={() => handleDeletePet(selectedPet)}
+                  >
+                    <Text style={[styles.cancelText, { color: '#FFF' }]}>Delete</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.cancelButton, { backgroundColor: t.inputBg, borderColor: t.cardShadow }]}
+                    onPress={() => setPetDetailVisible(false)}
+                  >
                     <Text style={[styles.cancelText, { color: t.textPrimary }]}>Close</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             </View>
-          ) : null}
+          )}
         </View>
       </Modal>
 
@@ -316,61 +432,96 @@ export default function Dashboard({ onLogout }) {
           <ScrollView contentContainerStyle={{ padding: 12 }}>
             <Text style={[styles.menuTitle, { color: t.titleText }]}>Add a new pet</Text>
 
-            <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Name</Text>
-            <TextInput value={formName} onChangeText={setFormName} style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0' }]} placeholder="e.g. Coco" placeholderTextColor={ theme === 'dark' ? '#999' : '#666' } />
+            <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Name *</Text>
+            <TextInput
+              value={formName}
+              onChangeText={setFormName}
+              style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0', color: t.textPrimary }]}
+              placeholder="e.g. Buddy"
+              placeholderTextColor={theme === 'dark' ? '#999' : '#666'}
+              editable={!isSavingPet}
+            />
 
             <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Breed</Text>
-            <TextInput value={formBreed} onChangeText={setFormBreed} style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0' }]} placeholder="e.g. Labrador" placeholderTextColor={ theme === 'dark' ? '#999' : '#666' } />
+            <TextInput
+              value={formBreed}
+              onChangeText={setFormBreed}
+              style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0', color: t.textPrimary }]}
+              placeholder="e.g. Labrador"
+              placeholderTextColor={theme === 'dark' ? '#999' : '#666'}
+              editable={!isSavingPet}
+            />
 
             <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Age</Text>
-            <TextInput value={formAge} onChangeText={setFormAge} style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0' }]} placeholder="e.g. 2 yrs" placeholderTextColor={ theme === 'dark' ? '#999' : '#666' } />
+            <TextInput
+              value={formAge}
+              onChangeText={setFormAge}
+              style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0', color: t.textPrimary }]}
+              placeholder="e.g. 2 yrs"
+              placeholderTextColor={theme === 'dark' ? '#999' : '#666'}
+              editable={!isSavingPet}
+            />
 
             <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Height</Text>
-            <TextInput value={formHeight} onChangeText={setFormHeight} style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0' }]} placeholder="e.g. 55 cm" placeholderTextColor={ theme === 'dark' ? '#999' : '#666' } />
+            <TextInput
+              value={formHeight}
+              onChangeText={setFormHeight}
+              style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0', color: t.textPrimary }]}
+              placeholder="e.g. 55 cm"
+              placeholderTextColor={theme === 'dark' ? '#999' : '#666'}
+              editable={!isSavingPet}
+            />
 
             <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Weight</Text>
-            <TextInput value={formWeight} onChangeText={setFormWeight} style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0' }]} placeholder="e.g. 12 kg" placeholderTextColor={ theme === 'dark' ? '#999' : '#666' } />
+            <TextInput
+              value={formWeight}
+              onChangeText={setFormWeight}
+              style={[styles.input, { backgroundColor: t.inputBg, borderColor: theme === 'dark' ? '#333' : '#EFE6E0', color: t.textPrimary }]}
+              placeholder="e.g. 12 kg"
+              placeholderTextColor={theme === 'dark' ? '#999' : '#666'}
+              editable={!isSavingPet}
+            />
 
             <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Personality</Text>
             <View style={styles.personalityRow}>
               {Object.keys(PERSONALITY_COLORS).map((p) => (
-                <TouchableOpacity key={p} style={[styles.personalityOption, formPersonality === p ? styles.personalityOptionActive : null, { backgroundColor: t.modalBg }]} onPress={() => setFormPersonality(p)}>
+                <TouchableOpacity
+                  key={p}
+                  style={[
+                    styles.personalityOption,
+                    formPersonality === p ? styles.personalityOptionActive : null,
+                    { backgroundColor: t.modalBg }
+                  ]}
+                  onPress={() => setFormPersonality(p)}
+                  disabled={isSavingPet}
+                >
                   <View style={[styles.personalitySwatch, { backgroundColor: PERSONALITY_COLORS[p] }]} />
-                  <Text style={[styles.personalityOptionText, { color: t.textPrimary }]}>{p.charAt(0).toUpperCase() + p.slice(1)}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.inputLabel, { marginTop: 12, color: t.textSecondary }]}>Choose image</Text>
-            <View style={styles.imagePickerRow}>
-              {INITIAL_PETS.map((pi) => (
-                <TouchableOpacity key={pi.id} onPress={() => setFormImage(pi.image)} style={[styles.imageThumbWrap, formImage === pi.image ? [styles.imageThumbActive, { borderColor: t.accent }] : null]}>
-                  <Image source={pi.image} style={styles.imageThumb} />
+                  <Text style={[styles.personalityOptionText, { color: t.textPrimary }]}>
+                    {p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-              <TouchableOpacity style={[styles.cancelButton, { backgroundColor: t.inputBg, borderColor: t.cardShadow }]} onPress={() => setAddModalVisible(false)}>
+              <TouchableOpacity
+                style={[styles.cancelButton, { backgroundColor: t.inputBg, borderColor: t.cardShadow }]}
+                onPress={() => setAddModalVisible(false)}
+                disabled={isSavingPet}
+              >
                 <Text style={[styles.cancelText, { color: t.textPrimary }]}>Cancel</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.submitButton, { backgroundColor: t.accent }]} onPress={() => {
-                if (!formName.trim()) { Alert.alert('Validation', 'Please enter a name'); return; }
-                const newPet = {
-                  id: Date.now().toString(),
-                  name: formName,
-                  breed: formBreed,
-                  age: formAge,
-                  height: formHeight,
-                  weight: formWeight,
-                  personality: formPersonality,
-                  image: formImage,
-                };
-                setPets([newPet, ...pets]);
-                setAddModalVisible(false);
-              }}>
-                <Text style={styles.submitText}>Add Pet</Text>
+              <TouchableOpacity
+                style={[styles.submitButton, { backgroundColor: t.accent }, isSavingPet && { opacity: 0.6 }]}
+                onPress={handleSavePet}
+                disabled={isSavingPet}
+              >
+                {isSavingPet ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.submitText}>Add Pet</Text>
+                )}
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -382,7 +533,7 @@ export default function Dashboard({ onLogout }) {
   );
 }
 
-// All the styles from your new file are kept here
+// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -671,6 +822,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     borderRadius: 8,
     backgroundColor: '#FF8A65',
+    minWidth: 100,
+    alignItems: 'center',
   },
   submitText: {
     color: '#fff',
