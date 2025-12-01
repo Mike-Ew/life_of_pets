@@ -9,14 +9,8 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useNavigate, Link } from 'react-router-native';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import * as Facebook from 'expo-auth-session/providers/facebook';
 import { useAuth } from '../contexts/AuthContext';
 import { styles } from './ScreenStyles';
-
-// Ensure web browser closes properly after auth
-WebBrowser.maybeCompleteAuthSession();
 
 const AUTH_BACKGROUND = require('../../assets/Pet Pictures/auth_background.jpg');
 
@@ -26,6 +20,24 @@ const AUTH_BACKGROUND = require('../../assets/Pet Pictures/auth_background.jpg')
 const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 const FACEBOOK_APP_ID = 'YOUR_FACEBOOK_APP_ID';
 
+// Dynamic imports for social auth - these require native modules
+let WebBrowser = null;
+let Google = null;
+let Facebook = null;
+let socialAuthAvailable = false;
+
+try {
+  WebBrowser = require('expo-web-browser');
+  Google = require('expo-auth-session/providers/google');
+  Facebook = require('expo-auth-session/providers/facebook');
+  socialAuthAvailable = true;
+  // Ensure web browser closes properly after auth
+  WebBrowser.maybeCompleteAuthSession();
+} catch (error) {
+  console.log('Social auth modules not available:', error.message);
+  socialAuthAvailable = false;
+}
+
 function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -34,15 +46,17 @@ function LoginScreen() {
   const navigate = useNavigate();
   const { login, googleLogin, facebookLogin } = useAuth();
 
-  // Google Auth setup
-  const [, googleResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+  // Google Auth setup - only if available
+  const googleAuth = socialAuthAvailable && Google ? Google.useIdTokenAuthRequest({
     clientId: GOOGLE_CLIENT_ID,
-  });
+  }) : [null, null, null];
+  const [, googleResponse, promptGoogleAsync] = googleAuth;
 
-  // Facebook Auth setup
-  const [, facebookResponse, promptFacebookAsync] = Facebook.useAuthRequest({
+  // Facebook Auth setup - only if available
+  const facebookAuth = socialAuthAvailable && Facebook ? Facebook.useAuthRequest({
     clientId: FACEBOOK_APP_ID,
-  });
+  }) : [null, null, null];
+  const [, facebookResponse, promptFacebookAsync] = facebookAuth;
 
   const handleSubmit = async () => {
     if (!username || !password) {
@@ -62,6 +76,11 @@ function LoginScreen() {
   };
 
   const handleGoogleLogin = async () => {
+    if (!socialAuthAvailable || !promptGoogleAsync) {
+      Alert.alert('Unavailable', 'Google login requires a native build. Please use email/password login.');
+      return;
+    }
+
     try {
       setIsSocialLoading('google');
       const result = await promptGoogleAsync();
@@ -84,6 +103,11 @@ function LoginScreen() {
   };
 
   const handleFacebookLogin = async () => {
+    if (!socialAuthAvailable || !promptFacebookAsync) {
+      Alert.alert('Unavailable', 'Facebook login requires a native build. Please use email/password login.');
+      return;
+    }
+
     try {
       setIsSocialLoading('facebook');
       const result = await promptFacebookAsync();
@@ -175,7 +199,8 @@ function LoginScreen() {
               style={[
                 styles.socialButton,
                 styles.googleButton,
-                isSocialLoading === 'google' && { opacity: 0.6 }
+                isSocialLoading === 'google' && { opacity: 0.6 },
+                !socialAuthAvailable && { opacity: 0.5 }
               ]}
               onPress={handleGoogleLogin}
               disabled={isLoading || isSocialLoading !== null}
@@ -196,7 +221,8 @@ function LoginScreen() {
               style={[
                 styles.socialButton,
                 styles.facebookButton,
-                isSocialLoading === 'facebook' && { opacity: 0.6 }
+                isSocialLoading === 'facebook' && { opacity: 0.6 },
+                !socialAuthAvailable && { opacity: 0.5 }
               ]}
               onPress={handleFacebookLogin}
               disabled={isLoading || isSocialLoading !== null}

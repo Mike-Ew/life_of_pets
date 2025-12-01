@@ -11,8 +11,19 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../contexts/AuthContext';
+
+// Dynamic import for image picker - requires native modules
+let ImagePicker = null;
+let imagePickerAvailable = false;
+
+try {
+  ImagePicker = require('expo-image-picker');
+  imagePickerAvailable = true;
+} catch (error) {
+  console.log('Image picker module not available:', error.message);
+  imagePickerAvailable = false;
+}
 
 export default function SettingsScreen({ t, theme, setTheme, onLogout }) {
   const { user, updateUser } = useAuth();
@@ -37,6 +48,11 @@ export default function SettingsScreen({ t, theme, setTheme, onLogout }) {
   const [showLocation, setShowLocation] = useState(false);
 
   const handlePickImage = async () => {
+    if (!imagePickerAvailable || !ImagePicker) {
+      Alert.alert('Unavailable', 'Image picker requires a native build. Profile picture cannot be changed in Expo Go.');
+      return;
+    }
+
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Please allow access to your photo library.');
