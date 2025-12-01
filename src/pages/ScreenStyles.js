@@ -117,4 +117,56 @@ export const styles = StyleSheet.create({
     color: '#6495ED',
     fontWeight: '600',
   },
+
+  // --- Social Login ---
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 12,
+    color: '#888',
+    fontSize: 14,
+  },
+  socialButtonsContainer: {
+    width: '100%',
+    gap: 12,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 10,
+  },
+  googleButton: {
+    backgroundColor: '#fff',
+    borderColor: '#ddd',
+  },
+  facebookButton: {
+    backgroundColor: '#1877F2',
+    borderColor: '#1877F2',
+  },
+  socialButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  googleButtonText: {
+    color: '#333',
+  },
+  facebookButtonText: {
+    color: '#fff',
+  },
+  socialIcon: {
+    fontSize: 20,
+  },
 });

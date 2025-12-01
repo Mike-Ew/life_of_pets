@@ -9,6 +9,8 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import AuthScreen from './src/pages/AuthScreen';
 import LoginScreen from './src/pages/LoginScreen';
 import SignUpScreen from './src/pages/SignUpScreen';
+import ForgotPasswordScreen from './src/pages/ForgotPasswordScreen';
+import ResetPasswordScreen from './src/pages/ResetPasswordScreen';
 import Dashboard from './src/pages/Dashboard';
 
 function AppNavigator() {
@@ -32,6 +34,8 @@ function AppNavigator() {
               <Route path="/" element={<AuthScreen />} />
               <Route path="/login" element={<LoginScreen />} />
               <Route path="/signup" element={<SignUpScreen />} />
+              <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+              <Route path="/reset-password" element={<ResetPasswordScreen />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           ) : (

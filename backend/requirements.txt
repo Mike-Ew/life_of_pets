@@ -19,3 +19,6 @@ drf-spectacular>=0.27.0
 
 # Development tools
 django-extensions>=3.2.0
+
+# HTTP requests (for OAuth token verification)
+requests>=2.31.0

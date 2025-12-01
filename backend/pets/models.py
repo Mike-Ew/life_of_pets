@@ -10,6 +10,7 @@ class Pet(models.Model):
         ('playful', 'Playful'),
         ('curious', 'Curious'),
         ('gentle', 'Gentle'),
+        ('energetic', 'Energetic'),
     ]
 
     owner = models.ForeignKey(
@@ -68,3 +69,102 @@ class PetPhoto(models.Model):
         if self.is_main:
             PetPhoto.objects.filter(pet=self.pet, is_main=True).update(is_main=False)
         super().save(*args, **kwargs)
+
+
+class MatchingPreferences(models.Model):
+    """Preferences for pet matching."""
+
+    LOOKING_FOR_CHOICES = [
+        ('playmate', 'Playmate'),
+        ('adoption', 'Adoption'),
+        ('breeding', 'Breeding'),
+        ('any', 'Any'),
+    ]
+
+    pet = models.OneToOneField(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='matching_preferences'
+    )
+    looking_for = models.CharField(
+        max_length=20,
+        choices=LOOKING_FOR_CHOICES,
+        default='playmate'
+    )
+    # Personality preferences (which personalities to match with)
+    preferred_personalities = models.JSONField(default=list, blank=True)
+    # Age range preferences
+    min_age = models.IntegerField(null=True, blank=True)  # in years
+    max_age = models.IntegerField(null=True, blank=True)
+    # Size preferences
+    preferred_sizes = models.JSONField(default=list, blank=True)  # ['small', 'medium', 'large']
+    # Distance preference in km
+    max_distance = models.IntegerField(default=50)
+    # Is active for matching
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'matching_preferences'
+        verbose_name = 'Matching Preferences'
+        verbose_name_plural = 'Matching Preferences'
+
+
+class Swipe(models.Model):
+    """Records swipe actions between pets."""
+
+    ACTION_CHOICES = [
+        ('like', 'Like'),
+        ('dislike', 'Dislike'),
+        ('super_like', 'Super Like'),
+    ]
+
+    swiper_pet = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='swipes_made'
+    )
+    swiped_pet = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='swipes_received'
+    )
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'swipes'
+        verbose_name = 'Swipe'
+        verbose_name_plural = 'Swipes'
+        unique_together = ['swiper_pet', 'swiped_pet']
+
+    def __str__(self):
+        return f"{self.swiper_pet.name} {self.action}d {self.swiped_pet.name}"
+
+
+class Match(models.Model):
+    """Records mutual matches between pets."""
+
+    pet1 = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='matches_as_pet1'
+    )
+    pet2 = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='matches_as_pet2'
+    )
+    matched_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'matches'
+        verbose_name = 'Match'
+        verbose_name_plural = 'Matches'
+        unique_together = ['pet1', 'pet2']
+
+    def __str__(self):
+        return f"Match: {self.pet1.name} & {self.pet2.name}"

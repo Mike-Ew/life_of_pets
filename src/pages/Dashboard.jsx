@@ -15,16 +15,18 @@ import {
   TouchableWithoutFeedback,
   TextInput,
   ScrollView,
-  Switch,
   ActivityIndicator,
 } from "react-native";
+import * as ImagePicker from 'expo-image-picker';
 import PetCard from '../components/PetCard';
 import MenuModal from '../components/MenuModal';
 import ActivityMonitor from '../components/ActivityMonitor';
 import HealthFeeding from '../components/HealthFeeding';
 import Expenses from '../components/Expenses';
+import DiscoveryScreen from '../components/DiscoveryScreen';
+import SettingsScreen from '../components/SettingsScreen';
+import RemindersScreen from '../components/RemindersScreen';
 import { petsAPI, eventsAPI } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
 
 // Fallback images for pets without photos
 const DEFAULT_IMAGES = [
@@ -32,6 +34,10 @@ const DEFAULT_IMAGES = [
   require("../../assets/Pet Pictures/david-lezcano-m-Doa-GTrUw-unsplash.jpg"),
   require("../../assets/Pet Pictures/IMG_3229.jpeg"),
   require("../../assets/Pet Pictures/richard-brutyo-Sg3XwuEpybU-unsplash.jpg"),
+  require("../../assets/Pet Pictures/alvan-nee-1VgfQdCuX-4-unsplash.jpg"),
+  require("../../assets/Pet Pictures/alvan-nee-T-0EW-SEbsE-unsplash.jpg"), 
+  require("../../assets/Pet Pictures/IMG_3356.jpeg"),
+  require("../../assets/Pet Pictures/IMG_3077.jpeg"),
 ];
 
 const PERSONALITY_COLORS = {
@@ -39,6 +45,7 @@ const PERSONALITY_COLORS = {
   playful: "#FFE1B5",
   curious: "#F7D6E0",
   gentle: "#E0E0E0",
+  energetic: "#FFD3D3",
 };
 
 const THEMES = {
@@ -76,7 +83,6 @@ export default function Dashboard({ onLogout }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedScreen, setSelectedScreen] = useState("Dashboard");
-  const { user } = useAuth();
 
   // Add Pet modal state
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -87,6 +93,7 @@ export default function Dashboard({ onLogout }) {
   const [formHeight, setFormHeight] = useState("");
   const [formWeight, setFormWeight] = useState("");
   const [formDescription, setFormDescription] = useState("");
+  const [formImage, setFormImage] = useState(null);
   const [isSavingPet, setIsSavingPet] = useState(false);
 
   // Pet detail modal state
@@ -96,13 +103,69 @@ export default function Dashboard({ onLogout }) {
   const [theme, setTheme] = useState('light');
   const t = THEMES[theme];
 
+  // Discovery state
+  const [selectedDiscoveryPetId, setSelectedDiscoveryPetId] = useState(null);
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedPersonalityFilter, setSelectedPersonalityFilter] = useState(null);
+  const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest', 'name'
+
   const SCREENS = [
     "Dashboard",
+    "Discover",
+    "Reminders",
     "Activity Monitor",
     "Health & Feeding",
     "Expenses",
     "Settings",
   ];
+
+  // Filter and sort pets
+  const getFilteredPets = () => {
+    let filtered = [...pets];
+
+    // Search by name or breed
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        pet =>
+          pet.name.toLowerCase().includes(query) ||
+          (pet.breed && pet.breed.toLowerCase().includes(query))
+      );
+    }
+
+    // Filter by personality
+    if (selectedPersonalityFilter) {
+      filtered = filtered.filter(pet => pet.personality === selectedPersonalityFilter);
+    }
+
+    // Sort
+    switch (sortBy) {
+      case 'name':
+        filtered.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'oldest':
+        filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+        break;
+      case 'newest':
+      default:
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        break;
+    }
+
+    return filtered;
+  };
+
+  const filteredPets = getFilteredPets();
+  const hasActiveFilters = searchQuery || selectedPersonalityFilter || sortBy !== 'newest';
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedPersonalityFilter(null);
+    setSortBy('newest');
+  };
 
   // Load pets on mount
   useEffect(() => {
@@ -159,7 +222,49 @@ export default function Dashboard({ onLogout }) {
     setFormHeight("");
     setFormWeight("");
     setFormDescription("");
+    setFormImage(null);
     setAddModalVisible(true);
+  };
+
+  const pickImage = async () => {
+    // Request permission
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library to add pet photos.');
+      return;
+    }
+
+    // Launch image picker
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setFormImage(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    // Request permission
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow camera access to take pet photos.');
+      return;
+    }
+
+    // Launch camera
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setFormImage(result.assets[0].uri);
+    }
   };
 
   const handleSavePet = async () => {
@@ -180,10 +285,24 @@ export default function Dashboard({ onLogout }) {
         description: formDescription.trim(),
       });
 
-      // Add default image for display
+      // Upload photo if one was selected
+      let imageSource;
+      if (formImage) {
+        try {
+          await petsAPI.uploadPhoto(newPet.id, formImage);
+          imageSource = { uri: formImage };
+        } catch (uploadError) {
+          console.error('Error uploading photo:', uploadError);
+          // Continue without photo, use default
+          imageSource = DEFAULT_IMAGES[pets.length % DEFAULT_IMAGES.length];
+        }
+      } else {
+        imageSource = DEFAULT_IMAGES[pets.length % DEFAULT_IMAGES.length];
+      }
+
       const petWithImage = {
         ...newPet,
-        image: DEFAULT_IMAGES[pets.length % DEFAULT_IMAGES.length]
+        image: imageSource
       };
 
       setPets([petWithImage, ...pets]);
@@ -293,16 +412,104 @@ export default function Dashboard({ onLogout }) {
       />
 
       {selectedScreen === "Dashboard" ? (
-        <FlatList
-          data={pets}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderPet}
-          contentContainerStyle={pets.length === 0 ? { flex: 1 } : styles.list}
-          numColumns={NUM_COLUMNS}
-          refreshing={isRefreshing}
-          onRefresh={handleRefresh}
-          ListEmptyComponent={EmptyState}
+        <View style={{ flex: 1 }}>
+          {/* Search and Filter Bar */}
+          <View style={[styles.searchContainer, { backgroundColor: t.background }]}>
+            <View style={[styles.searchInputWrapper, { backgroundColor: t.cardBg, borderColor: t.cardShadow }]}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={[styles.searchInput, { color: t.textPrimary }]}
+                placeholder="Search by name or breed..."
+                placeholderTextColor={t.textSecondary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Text style={[styles.clearSearchIcon, { color: t.textSecondary }]}>✕</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={[styles.filterButton, { backgroundColor: t.cardBg, borderColor: hasActiveFilters ? t.accent : t.cardShadow }]}
+              onPress={() => setFilterModalVisible(true)}
+            >
+              <Text style={[styles.filterIcon, hasActiveFilters && { color: t.accent }]}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Active Filters Display */}
+          {hasActiveFilters && (
+            <View style={[styles.activeFiltersRow, { backgroundColor: t.background }]}>
+              {selectedPersonalityFilter && (
+                <View style={[styles.filterChip, { backgroundColor: PERSONALITY_COLORS[selectedPersonalityFilter] }]}>
+                  <Text style={styles.filterChipText}>
+                    {selectedPersonalityFilter.charAt(0).toUpperCase() + selectedPersonalityFilter.slice(1)}
+                  </Text>
+                  <TouchableOpacity onPress={() => setSelectedPersonalityFilter(null)}>
+                    <Text style={styles.filterChipClose}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {sortBy !== 'newest' && (
+                <View style={[styles.filterChip, { backgroundColor: t.cardBg }]}>
+                  <Text style={[styles.filterChipText, { color: t.textPrimary }]}>
+                    Sort: {sortBy === 'name' ? 'A-Z' : 'Oldest'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setSortBy('newest')}>
+                    <Text style={[styles.filterChipClose, { color: t.textPrimary }]}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              <TouchableOpacity onPress={clearFilters}>
+                <Text style={[styles.clearAllText, { color: t.accent }]}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Results Count */}
+          {pets.length > 0 && (
+            <Text style={[styles.resultsCount, { color: t.textSecondary }]}>
+              {filteredPets.length} of {pets.length} pets
+            </Text>
+          )}
+
+          <FlatList
+            data={filteredPets}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={renderPet}
+            contentContainerStyle={filteredPets.length === 0 ? { flex: 1 } : styles.list}
+            numColumns={NUM_COLUMNS}
+            refreshing={isRefreshing}
+            onRefresh={handleRefresh}
+            ListEmptyComponent={
+              pets.length === 0 ? EmptyState : (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 }}>
+                  <Text style={{ fontSize: 48, marginBottom: 16 }}>🔍</Text>
+                  <Text style={[styles.placeholderTitle, { color: t.titleText }]}>No Results</Text>
+                  <Text style={[styles.placeholderText, { color: t.textSecondary, textAlign: 'center' }]}>
+                    No pets match your search. Try different filters.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.submitButton, { backgroundColor: t.accent, marginTop: 16 }]}
+                    onPress={clearFilters}
+                  >
+                    <Text style={styles.submitText}>Clear Filters</Text>
+                  </TouchableOpacity>
+                </View>
+              )
+            }
+          />
+        </View>
+      ) : selectedScreen === 'Discover' ? (
+        <DiscoveryScreen
+          pets={pets}
+          selectedPetId={selectedDiscoveryPetId || (pets.length > 0 ? pets[0].id : null)}
+          t={t}
+          onBack={() => setSelectedScreen('Dashboard')}
         />
+      ) : selectedScreen === 'Reminders' ? (
+        <RemindersScreen pets={pets} t={t} />
       ) : selectedScreen === 'Activity Monitor' ? (
         <ActivityMonitor pets={pets} t={t} />
       ) : selectedScreen === 'Health & Feeding' ? (
@@ -310,46 +517,12 @@ export default function Dashboard({ onLogout }) {
       ) : selectedScreen === 'Expenses' ? (
         <Expenses t={t} />
       ) : selectedScreen === 'Settings' ? (
-        <View style={[styles.placeholderContainer, { backgroundColor: t.background }]}>
-          <View style={{ width: '100%', paddingHorizontal: 20 }}>
-            <Text style={[styles.menuTitle, { color: t.titleText }]}>Settings</Text>
-
-            {user && (
-              <View style={{ marginTop: 16, marginBottom: 16 }}>
-                <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Account</Text>
-                <Text style={{ color: t.textPrimary, fontSize: 16, marginTop: 4 }}>
-                  {user.username}
-                </Text>
-                {user.email && (
-                  <Text style={{ color: t.textSecondary, fontSize: 14, marginTop: 2 }}>
-                    {user.email}
-                  </Text>
-                )}
-              </View>
-            )}
-
-            <View style={{ marginTop: 12 }}>
-              <Text style={[styles.inputLabel, { color: t.textSecondary }]}>Display</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                <Text style={{ color: t.textPrimary, fontWeight: '600' }}>Dark mode</Text>
-                <Switch
-                  value={theme === 'dark'}
-                  onValueChange={(v) => setTheme(v ? 'dark' : 'light')}
-                  thumbColor={t.accent}
-                />
-              </View>
-            </View>
-
-            <View style={{ marginTop: 24 }}>
-              <TouchableOpacity
-                style={[styles.submitButton, { backgroundColor: t.accent }]}
-                onPress={onLogout}
-              >
-                <Text style={styles.submitText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        <SettingsScreen
+          t={t}
+          theme={theme}
+          setTheme={setTheme}
+          onLogout={onLogout}
+        />
       ) : (
         <View style={styles.placeholderContainer}>
           <Text style={[styles.placeholderTitle, { color: t.titleText }]}>{selectedScreen}</Text>
@@ -503,6 +676,41 @@ export default function Dashboard({ onLogout }) {
               ))}
             </View>
 
+            <Text style={[styles.inputLabel, { color: t.textSecondary, marginTop: 12 }]}>Photo</Text>
+            <View style={styles.photoPickerContainer}>
+              {formImage ? (
+                <View style={styles.selectedImageContainer}>
+                  <Image source={{ uri: formImage }} style={styles.selectedImage} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => setFormImage(null)}
+                    disabled={isSavingPet}
+                  >
+                    <Text style={styles.removeImageText}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.photoButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.photoButton, { backgroundColor: t.modalBg, borderColor: t.cardShadow }]}
+                    onPress={pickImage}
+                    disabled={isSavingPet}
+                  >
+                    <Text style={styles.photoButtonIcon}>🖼️</Text>
+                    <Text style={[styles.photoButtonText, { color: t.textPrimary }]}>Gallery</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.photoButton, { backgroundColor: t.modalBg, borderColor: t.cardShadow }]}
+                    onPress={takePhoto}
+                    disabled={isSavingPet}
+                  >
+                    <Text style={styles.photoButtonIcon}>📷</Text>
+                    <Text style={[styles.photoButtonText, { color: t.textPrimary }]}>Camera</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
               <TouchableOpacity
                 style={[styles.cancelButton, { backgroundColor: t.inputBg, borderColor: t.cardShadow }]}
@@ -525,6 +733,90 @@ export default function Dashboard({ onLogout }) {
               </TouchableOpacity>
             </View>
           </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal visible={filterModalVisible} transparent animationType="slide">
+        <TouchableWithoutFeedback onPress={() => setFilterModalVisible(false)}>
+          <View style={styles.modalOverlay} />
+        </TouchableWithoutFeedback>
+
+        <View style={[styles.filterModalContainer, { backgroundColor: t.modalBg, shadowColor: t.cardShadow }]}>
+          <Text style={[styles.menuTitle, { color: t.titleText }]}>Filter & Sort</Text>
+
+          {/* Personality Filter */}
+          <Text style={[styles.inputLabel, { color: t.textSecondary, marginTop: 16 }]}>Personality</Text>
+          <View style={styles.filterPersonalityGrid}>
+            <TouchableOpacity
+              style={[
+                styles.filterPersonalityOption,
+                !selectedPersonalityFilter && styles.filterPersonalityOptionActive,
+                { backgroundColor: t.cardBg }
+              ]}
+              onPress={() => setSelectedPersonalityFilter(null)}
+            >
+              <Text style={[styles.filterPersonalityText, { color: t.textPrimary }]}>All</Text>
+            </TouchableOpacity>
+            {Object.keys(PERSONALITY_COLORS).map((p) => (
+              <TouchableOpacity
+                key={p}
+                style={[
+                  styles.filterPersonalityOption,
+                  selectedPersonalityFilter === p && styles.filterPersonalityOptionActive,
+                  { backgroundColor: PERSONALITY_COLORS[p] }
+                ]}
+                onPress={() => setSelectedPersonalityFilter(p)}
+              >
+                <Text style={styles.filterPersonalityText}>
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Sort Options */}
+          <Text style={[styles.inputLabel, { color: t.textSecondary, marginTop: 20 }]}>Sort By</Text>
+          <View style={styles.sortOptionsContainer}>
+            {[
+              { key: 'newest', label: 'Newest First' },
+              { key: 'oldest', label: 'Oldest First' },
+              { key: 'name', label: 'Name (A-Z)' },
+            ].map((option) => (
+              <TouchableOpacity
+                key={option.key}
+                style={[
+                  styles.sortOption,
+                  sortBy === option.key && [styles.sortOptionActive, { borderColor: t.accent }],
+                  { backgroundColor: t.cardBg }
+                ]}
+                onPress={() => setSortBy(option.key)}
+              >
+                <Text style={[
+                  styles.sortOptionText,
+                  { color: sortBy === option.key ? t.accent : t.textPrimary }
+                ]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.filterActions}>
+            <TouchableOpacity
+              style={[styles.cancelButton, { backgroundColor: t.inputBg, borderColor: t.cardShadow }]}
+              onPress={clearFilters}
+            >
+              <Text style={[styles.cancelText, { color: t.textPrimary }]}>Reset</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.submitButton, { backgroundColor: t.accent }]}
+              onPress={() => setFilterModalVisible(false)}
+            >
+              <Text style={styles.submitText}>Apply</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -851,5 +1143,187 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#4A2F28',
     fontWeight: '600',
+  },
+  photoPickerContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  photoButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    gap: 12,
+  },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+  },
+  photoButtonIcon: {
+    fontSize: 20,
+  },
+  photoButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  selectedImageContainer: {
+    position: 'relative',
+    width: 120,
+    height: 120,
+  },
+  selectedImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 10,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FF6B6B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  // Search and Filter Styles
+  searchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  searchInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 4,
+  },
+  clearSearchIcon: {
+    fontSize: 16,
+    padding: 4,
+  },
+  filterButton: {
+    width: 44,
+    height: 44,
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterIcon: {
+    fontSize: 20,
+  },
+  activeFiltersRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    gap: 8,
+    alignItems: 'center',
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    gap: 6,
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5A3E36',
+  },
+  filterChipClose: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#5A3E36',
+  },
+  clearAllText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  resultsCount: {
+    fontSize: 13,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  filterModalContainer: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    right: 20,
+    borderRadius: 12,
+    padding: 16,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  filterPersonalityGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  filterPersonalityOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  filterPersonalityOptionActive: {
+    borderColor: '#5A3E36',
+  },
+  filterPersonalityText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5A3E36',
+  },
+  sortOptionsContainer: {
+    marginTop: 8,
+    gap: 8,
+  },
+  sortOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  sortOptionActive: {
+    borderWidth: 2,
+  },
+  sortOptionText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  filterActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
   },
 });

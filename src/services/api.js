@@ -122,6 +122,47 @@ export const authAPI = {
     const response = await api.put('/auth/me/', userData);
     return response.data;
   },
+
+  async forgotPassword(email) {
+    const response = await api.post('/auth/forgot-password/', { email });
+    return response.data;
+  },
+
+  async verifyResetToken(token) {
+    const response = await api.post('/auth/verify-reset-token/', { token });
+    return response.data;
+  },
+
+  async resetPassword(token, password, password2) {
+    const response = await api.post('/auth/reset-password/', {
+      token,
+      password,
+      password2,
+    });
+    return response.data;
+  },
+
+  async googleAuth(idToken) {
+    const response = await api.post('/auth/google/', { id_token: idToken });
+    if (response.data.tokens) {
+      await tokenManager.setTokens(
+        response.data.tokens.access,
+        response.data.tokens.refresh
+      );
+    }
+    return response.data;
+  },
+
+  async facebookAuth(accessToken) {
+    const response = await api.post('/auth/facebook/', { access_token: accessToken });
+    if (response.data.tokens) {
+      await tokenManager.setTokens(
+        response.data.tokens.access,
+        response.data.tokens.refresh
+      );
+    }
+    return response.data;
+  },
 };
 
 // Pets API
@@ -175,6 +216,38 @@ export const petsAPI = {
 
   async getPhotos(petId) {
     const response = await api.get(`/pets/${petId}/photos/`);
+    return response.data;
+  },
+
+  // Matching preferences
+  async getPreferences(petId) {
+    const response = await api.get(`/pets/${petId}/preferences/`);
+    return response.data;
+  },
+
+  async updatePreferences(petId, preferences) {
+    const response = await api.patch(`/pets/${petId}/preferences/`, preferences);
+    return response.data;
+  },
+};
+
+// Discovery & Matching API
+export const matchingAPI = {
+  async getDiscoveryFeed(petId, limit = 20) {
+    const response = await api.get(`/pets/discover/${petId}/?limit=${limit}`);
+    return response.data;
+  },
+
+  async swipe(petId, swipedPetId, action) {
+    const response = await api.post(`/pets/${petId}/swipe/`, {
+      swiped_pet_id: swipedPetId,
+      action,
+    });
+    return response.data;
+  },
+
+  async getMatches() {
+    const response = await api.get('/pets/matches/');
     return response.data;
   },
 };
