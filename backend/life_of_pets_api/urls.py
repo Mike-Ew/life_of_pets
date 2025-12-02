@@ -32,6 +32,7 @@ urlpatterns = [
     # API endpoints
     path('api/pets/', include('pets.urls')),
     path('api/events/', include('events.urls')),
+    path('api/', include('pets.api_urls')),  # Activities, Feeding, Expenses
 ]
 
 # Serve media files in development

@@ -3,8 +3,9 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
-from django.db.models import Q
-from .models import Pet, PetPhoto, MatchingPreferences, Swipe, Match
+from django.db.models import Q, Sum
+from datetime import date
+from .models import Pet, PetPhoto, MatchingPreferences, Swipe, Match, Activity, FeedingSchedule, Expense
 from .serializers import (
     PetSerializer,
     PetPhotoSerializer,
@@ -12,6 +13,10 @@ from .serializers import (
     SwipeSerializer,
     MatchSerializer,
     DiscoveryPetSerializer,
+    ActivitySerializer,
+    FeedingScheduleSerializer,
+    ExpenseSerializer,
+    ExpenseSummarySerializer,
 )
 
 
@@ -260,3 +265,149 @@ class MatchesView(APIView):
 
         serializer = MatchSerializer(matches, many=True)
         return Response(serializer.data)
+
+
+class ActivityViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing pet activities."""
+    serializer_class = ActivitySerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return activities for the user's pets."""
+        user_pet_ids = Pet.objects.filter(owner=self.request.user).values_list('id', flat=True)
+        queryset = Activity.objects.filter(pet_id__in=user_pet_ids).select_related('pet')
+
+        # Filter by pet if specified
+        pet_id = self.request.query_params.get('pet')
+        if pet_id:
+            queryset = queryset.filter(pet_id=pet_id)
+
+        # Filter by date if specified
+        date_param = self.request.query_params.get('date')
+        if date_param:
+            queryset = queryset.filter(date=date_param)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Validate that the pet belongs to the user."""
+        pet = serializer.validated_data.get('pet')
+        if pet.owner != self.request.user:
+            raise PermissionError("You can only add activities for your own pets.")
+        serializer.save()
+
+    @action(detail=False, methods=['get'], url_path='today')
+    def today(self, request):
+        """Get today's activities for all user's pets."""
+        user_pet_ids = Pet.objects.filter(owner=request.user).values_list('id', flat=True)
+        activities = Activity.objects.filter(
+            pet_id__in=user_pet_ids,
+            date=date.today()
+        ).select_related('pet')
+        serializer = self.get_serializer(activities, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='log')
+    def log_activity(self, request):
+        """Log or update today's activity for a pet."""
+        pet_id = request.data.get('pet')
+        if not pet_id:
+            return Response({'error': 'pet is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            pet = Pet.objects.get(id=pet_id, owner=request.user)
+        except Pet.DoesNotExist:
+            return Response({'error': 'Pet not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        activity, created = Activity.objects.update_or_create(
+            pet=pet,
+            date=date.today(),
+            defaults={
+                'walking_minutes': request.data.get('walking_minutes', 0),
+                'steps': request.data.get('steps', 0),
+                'play_minutes': request.data.get('play_minutes', 0),
+                'notes': request.data.get('notes', ''),
+            }
+        )
+        serializer = self.get_serializer(activity)
+        return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+class FeedingScheduleViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing feeding schedules."""
+    serializer_class = FeedingScheduleSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return feeding schedules for the user's pets."""
+        user_pet_ids = Pet.objects.filter(owner=self.request.user).values_list('id', flat=True)
+        queryset = FeedingSchedule.objects.filter(pet_id__in=user_pet_ids).select_related('pet')
+
+        # Filter by pet if specified
+        pet_id = self.request.query_params.get('pet')
+        if pet_id:
+            queryset = queryset.filter(pet_id=pet_id)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Validate that the pet belongs to the user."""
+        pet = serializer.validated_data.get('pet')
+        if pet.owner != self.request.user:
+            raise PermissionError("You can only add feeding schedules for your own pets.")
+        serializer.save()
+
+
+class ExpenseViewSet(viewsets.ModelViewSet):
+    """ViewSet for managing expenses."""
+    serializer_class = ExpenseSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """Return expenses for the user."""
+        queryset = Expense.objects.filter(owner=self.request.user).select_related('pet')
+
+        # Filter by pet if specified
+        pet_id = self.request.query_params.get('pet')
+        if pet_id:
+            queryset = queryset.filter(pet_id=pet_id)
+
+        # Filter by category if specified
+        category = self.request.query_params.get('category')
+        if category:
+            queryset = queryset.filter(category=category)
+
+        # Filter by date range
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+        if start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
+        return queryset
+
+    def perform_create(self, serializer):
+        """Set owner and validate pet ownership."""
+        pet = serializer.validated_data.get('pet')
+        if pet and pet.owner != self.request.user:
+            raise PermissionError("You can only add expenses for your own pets.")
+        serializer.save(owner=self.request.user)
+
+    @action(detail=False, methods=['get'], url_path='summary')
+    def summary(self, request):
+        """Get expense summary by category."""
+        queryset = self.get_queryset()
+
+        # Group by category and sum
+        summary = queryset.values('category').annotate(
+            total=Sum('amount')
+        ).order_by('-total')
+
+        # Calculate grand total
+        grand_total = sum(item['total'] for item in summary)
+
+        return Response({
+            'categories': list(summary),
+            'total': grand_total
+        })

@@ -141,28 +141,6 @@ export const authAPI = {
     });
     return response.data;
   },
-
-  async googleAuth(idToken) {
-    const response = await api.post('/auth/google/', { id_token: idToken });
-    if (response.data.tokens) {
-      await tokenManager.setTokens(
-        response.data.tokens.access,
-        response.data.tokens.refresh
-      );
-    }
-    return response.data;
-  },
-
-  async facebookAuth(accessToken) {
-    const response = await api.post('/auth/facebook/', { access_token: accessToken });
-    if (response.data.tokens) {
-      await tokenManager.setTokens(
-        response.data.tokens.access,
-        response.data.tokens.refresh
-      );
-    }
-    return response.data;
-  },
 };
 
 // Pets API
@@ -277,6 +255,107 @@ export const eventsAPI = {
 
   async delete(id) {
     await api.delete(`/events/${id}/`);
+  },
+};
+
+// Activities API
+export const activitiesAPI = {
+  async getAll(petId = null) {
+    const params = petId ? `?pet=${petId}` : '';
+    const response = await api.get(`/activities/${params}`);
+    return response.data.results || response.data;
+  },
+
+  async getToday() {
+    const response = await api.get('/activities/today/');
+    return response.data;
+  },
+
+  async logActivity(petId, activityData) {
+    const response = await api.post('/activities/log/', {
+      pet: petId,
+      ...activityData,
+    });
+    return response.data;
+  },
+
+  async create(activityData) {
+    const response = await api.post('/activities/', activityData);
+    return response.data;
+  },
+
+  async update(id, activityData) {
+    const response = await api.patch(`/activities/${id}/`, activityData);
+    return response.data;
+  },
+
+  async delete(id) {
+    await api.delete(`/activities/${id}/`);
+  },
+};
+
+// Feeding Schedules API
+export const feedingAPI = {
+  async getAll(petId = null) {
+    const params = petId ? `?pet=${petId}` : '';
+    const response = await api.get(`/feeding-schedules/${params}`);
+    return response.data.results || response.data;
+  },
+
+  async create(scheduleData) {
+    const response = await api.post('/feeding-schedules/', scheduleData);
+    return response.data;
+  },
+
+  async update(id, scheduleData) {
+    const response = await api.patch(`/feeding-schedules/${id}/`, scheduleData);
+    return response.data;
+  },
+
+  async delete(id) {
+    await api.delete(`/feeding-schedules/${id}/`);
+  },
+};
+
+// Expenses API
+export const expensesAPI = {
+  async getAll(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.pet) params.append('pet', filters.pet);
+    if (filters.category) params.append('category', filters.category);
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+
+    const queryString = params.toString();
+    const url = queryString ? `/expenses/?${queryString}` : '/expenses/';
+    const response = await api.get(url);
+    return response.data.results || response.data;
+  },
+
+  async getSummary(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.pet) params.append('pet', filters.pet);
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+
+    const queryString = params.toString();
+    const url = queryString ? `/expenses/summary/?${queryString}` : '/expenses/summary/';
+    const response = await api.get(url);
+    return response.data;
+  },
+
+  async create(expenseData) {
+    const response = await api.post('/expenses/', expenseData);
+    return response.data;
+  },
+
+  async update(id, expenseData) {
+    const response = await api.patch(`/expenses/${id}/`, expenseData);
+    return response.data;
+  },
+
+  async delete(id) {
+    await api.delete(`/expenses/${id}/`);
   },
 };
 

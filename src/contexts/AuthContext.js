@@ -83,36 +83,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const googleLogin = async (idToken) => {
-    try {
-      const data = await authAPI.googleAuth(idToken);
-      setUser(data.user);
-      setIsLoggedIn(true);
-      return { success: true, isNewUser: data.created };
-    } catch (error) {
-      console.error('Google login error:', error);
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Google login failed.',
-      };
-    }
-  };
-
-  const facebookLogin = async (accessToken) => {
-    try {
-      const data = await authAPI.facebookAuth(accessToken);
-      setUser(data.user);
-      setIsLoggedIn(true);
-      return { success: true, isNewUser: data.created };
-    } catch (error) {
-      console.error('Facebook login error:', error);
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Facebook login failed.',
-      };
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -123,8 +93,6 @@ export const AuthProvider = ({ children }) => {
         register,
         logout,
         updateUser,
-        googleLogin,
-        facebookLogin,
       }}
     >
       {children}

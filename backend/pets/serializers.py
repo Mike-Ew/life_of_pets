@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Pet, PetPhoto, MatchingPreferences, Swipe, Match
+from .models import Pet, PetPhoto, MatchingPreferences, Swipe, Match, Activity, FeedingSchedule, Expense
 
 
 class PetPhotoSerializer(serializers.ModelSerializer):
@@ -83,3 +83,56 @@ class DiscoveryPetSerializer(serializers.ModelSerializer):
     def get_compatibility_score(self, obj):
         # This will be calculated in the view
         return getattr(obj, 'compatibility_score', None)
+
+
+class ActivitySerializer(serializers.ModelSerializer):
+    """Serializer for pet activities."""
+
+    pet_name = serializers.CharField(source='pet.name', read_only=True)
+
+    class Meta:
+        model = Activity
+        fields = [
+            'id', 'pet', 'pet_name', 'date', 'walking_minutes',
+            'steps', 'play_minutes', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class FeedingScheduleSerializer(serializers.ModelSerializer):
+    """Serializer for feeding schedules."""
+
+    pet_name = serializers.CharField(source='pet.name', read_only=True)
+
+    class Meta:
+        model = FeedingSchedule
+        fields = [
+            'id', 'pet', 'pet_name', 'time', 'food_type',
+            'portion', 'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ExpenseSerializer(serializers.ModelSerializer):
+    """Serializer for expenses."""
+
+    pet_name = serializers.CharField(source='pet.name', read_only=True, allow_null=True)
+
+    class Meta:
+        model = Expense
+        fields = [
+            'id', 'owner', 'pet', 'pet_name', 'category',
+            'amount', 'description', 'date', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        validated_data['owner'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class ExpenseSummarySerializer(serializers.Serializer):
+    """Serializer for expense summary by category."""
+
+    category = serializers.CharField()
+    total = serializers.DecimalField(max_digits=10, decimal_places=2)

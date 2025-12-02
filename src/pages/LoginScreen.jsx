@@ -14,49 +14,12 @@ import { styles } from './ScreenStyles';
 
 const AUTH_BACKGROUND = require('../../assets/Pet Pictures/auth_background.jpg');
 
-// OAuth Client IDs - Replace with your actual credentials
-// To set up Google OAuth: https://console.cloud.google.com/
-// To set up Facebook OAuth: https://developers.facebook.com/
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
-const FACEBOOK_APP_ID = 'YOUR_FACEBOOK_APP_ID';
-
-// Dynamic imports for social auth - these require native modules
-let WebBrowser = null;
-let Google = null;
-let Facebook = null;
-let socialAuthAvailable = false;
-
-try {
-  WebBrowser = require('expo-web-browser');
-  Google = require('expo-auth-session/providers/google');
-  Facebook = require('expo-auth-session/providers/facebook');
-  socialAuthAvailable = true;
-  // Ensure web browser closes properly after auth
-  WebBrowser.maybeCompleteAuthSession();
-} catch (error) {
-  console.log('Social auth modules not available:', error.message);
-  socialAuthAvailable = false;
-}
-
 function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSocialLoading, setIsSocialLoading] = useState(null);
   const navigate = useNavigate();
-  const { login, googleLogin, facebookLogin } = useAuth();
-
-  // Google Auth setup - only if available
-  const googleAuth = socialAuthAvailable && Google ? Google.useIdTokenAuthRequest({
-    clientId: GOOGLE_CLIENT_ID,
-  }) : [null, null, null];
-  const [, googleResponse, promptGoogleAsync] = googleAuth;
-
-  // Facebook Auth setup - only if available
-  const facebookAuth = socialAuthAvailable && Facebook ? Facebook.useAuthRequest({
-    clientId: FACEBOOK_APP_ID,
-  }) : [null, null, null];
-  const [, facebookResponse, promptFacebookAsync] = facebookAuth;
+  const { login } = useAuth();
 
   const handleSubmit = async () => {
     if (!username || !password) {
@@ -72,60 +35,6 @@ function LoginScreen() {
       navigate('/dashboard');
     } else {
       Alert.alert('Login Failed', result.error);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    if (!socialAuthAvailable || !promptGoogleAsync) {
-      Alert.alert('Unavailable', 'Google login requires a native build. Please use email/password login.');
-      return;
-    }
-
-    try {
-      setIsSocialLoading('google');
-      const result = await promptGoogleAsync();
-
-      if (result?.type === 'success') {
-        const { id_token } = result.params;
-        const loginResult = await googleLogin(id_token);
-
-        if (loginResult.success) {
-          navigate('/dashboard');
-        } else {
-          Alert.alert('Google Login Failed', loginResult.error);
-        }
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Google login failed. Please try again.');
-    } finally {
-      setIsSocialLoading(null);
-    }
-  };
-
-  const handleFacebookLogin = async () => {
-    if (!socialAuthAvailable || !promptFacebookAsync) {
-      Alert.alert('Unavailable', 'Facebook login requires a native build. Please use email/password login.');
-      return;
-    }
-
-    try {
-      setIsSocialLoading('facebook');
-      const result = await promptFacebookAsync();
-
-      if (result?.type === 'success') {
-        const { access_token } = result.params;
-        const loginResult = await facebookLogin(access_token);
-
-        if (loginResult.success) {
-          navigate('/dashboard');
-        } else {
-          Alert.alert('Facebook Login Failed', loginResult.error);
-        }
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Facebook login failed. Please try again.');
-    } finally {
-      setIsSocialLoading(null);
     }
   };
 
@@ -186,61 +95,7 @@ function LoginScreen() {
             )}
           </Pressable>
 
-          {/* Divider */}
-          <View style={styles.dividerContainer}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or continue with</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Social Login Buttons */}
-          <View style={styles.socialButtonsContainer}>
-            <Pressable
-              style={[
-                styles.socialButton,
-                styles.googleButton,
-                isSocialLoading === 'google' && { opacity: 0.6 },
-                !socialAuthAvailable && { opacity: 0.5 }
-              ]}
-              onPress={handleGoogleLogin}
-              disabled={isLoading || isSocialLoading !== null}
-            >
-              {isSocialLoading === 'google' ? (
-                <ActivityIndicator color="#333" />
-              ) : (
-                <>
-                  <Text style={styles.socialIcon}>G</Text>
-                  <Text style={[styles.socialButtonText, styles.googleButtonText]}>
-                    Continue with Google
-                  </Text>
-                </>
-              )}
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.socialButton,
-                styles.facebookButton,
-                isSocialLoading === 'facebook' && { opacity: 0.6 },
-                !socialAuthAvailable && { opacity: 0.5 }
-              ]}
-              onPress={handleFacebookLogin}
-              disabled={isLoading || isSocialLoading !== null}
-            >
-              {isSocialLoading === 'facebook' ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Text style={[styles.socialIcon, { color: '#fff' }]}>f</Text>
-                  <Text style={[styles.socialButtonText, styles.facebookButtonText]}>
-                    Continue with Facebook
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </View>
-
-          <Text style={styles.formLink}>
+          <Text style={[styles.formLink, { marginTop: 16 }]}>
             Need an account?{' '}
             <Link to="/signup">
               <Text style={styles.linkText}>Sign Up</Text>

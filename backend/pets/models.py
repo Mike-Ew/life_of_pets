@@ -168,3 +168,106 @@ class Match(models.Model):
 
     def __str__(self):
         return f"Match: {self.pet1.name} & {self.pet2.name}"
+
+
+class Activity(models.Model):
+    """Daily activity tracking for pets."""
+
+    pet = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='activities'
+    )
+    date = models.DateField()
+    walking_minutes = models.IntegerField(default=0)
+    steps = models.IntegerField(default=0)
+    play_minutes = models.IntegerField(default=0)
+    notes = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'activities'
+        verbose_name = 'Activity'
+        verbose_name_plural = 'Activities'
+        ordering = ['-date']
+        unique_together = ['pet', 'date']
+
+    def __str__(self):
+        return f"{self.pet.name} activity on {self.date}"
+
+
+class FeedingSchedule(models.Model):
+    """Feeding schedule for pets."""
+
+    pet = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='feeding_schedules'
+    )
+    time = models.TimeField()
+    food_type = models.CharField(max_length=100, blank=True)  # e.g., "Dry food", "Wet food"
+    portion = models.CharField(max_length=50, blank=True)  # e.g., "1 cup", "200g"
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'feeding_schedules'
+        verbose_name = 'Feeding Schedule'
+        verbose_name_plural = 'Feeding Schedules'
+        ordering = ['time']
+
+    def __str__(self):
+        return f"{self.pet.name} feeding at {self.time}"
+
+
+class Expense(models.Model):
+    """Expense tracking for pets."""
+
+    CATEGORY_CHOICES = [
+        ('food', 'Food'),
+        ('litter', 'Litter'),
+        ('medicines', 'Medicines'),
+        ('toys', 'Toys'),
+        ('grooming', 'Grooming'),
+        ('vet', 'Vet Bills'),
+        ('accessories', 'Accessories'),
+        ('other', 'Other'),
+    ]
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='expenses'
+    )
+    pet = models.ForeignKey(
+        Pet,
+        on_delete=models.CASCADE,
+        related_name='expenses',
+        null=True,
+        blank=True  # Allow general expenses not tied to a specific pet
+    )
+    category = models.CharField(
+        max_length=20,
+        choices=CATEGORY_CHOICES,
+        default='other'
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    description = models.CharField(max_length=200, blank=True)
+    date = models.DateField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'expenses'
+        verbose_name = 'Expense'
+        verbose_name_plural = 'Expenses'
+        ordering = ['-date']
+
+    def __str__(self):
+        pet_name = self.pet.name if self.pet else "General"
+        return f"{self.category} - ${self.amount} ({pet_name})"
